@@ -19,6 +19,8 @@ sudo apt install libsdl2-dev
 
 ## Integration
 
+Add the `run_simulator.py` script to `./scripts` in the Firmware's project root. This will add a Platformio task in the IDE to quickly run the simulator.
+
 Add the simulator to your firmware's platformio.ini as a lib_dep and configure the [env:simulator] environment:
 
 ```ini
@@ -57,7 +59,7 @@ lib_deps =
   links2004/WebSockets @ 2.7.3
 ```
 
-For local development, replace the git reference with a symlink:
+For local development, replace the git reference with a symlink after you've cloned the repository:
 
 ```ini
 simulator=symlink://../crosspoint-simulator
