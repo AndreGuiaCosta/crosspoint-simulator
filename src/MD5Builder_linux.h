@@ -1,34 +1,50 @@
 #pragma once
 
-// Linux stub: replace src/MD5Builder.h with this file on Linux.
-// Requires: sudo apt install libssl-dev  (Debian/Ubuntu)
-//           sudo dnf install openssl-devel  (Fedora)
-// Add to platformio.ini build_flags: -lssl -lcrypto
-//
-// OpenSSL 3.x deprecates MD5_Init/Update/Final; suppress with
-// -Wno-deprecated-declarations in build_flags if needed.
-
-#include <openssl/md5.h>
-
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
 
 #include "WString.h"
 
+#if defined(__APPLE__)
+#include <CommonCrypto/CommonDigest.h>
+#elif defined(__linux__)
+#include <openssl/md5.h>
+#else
+#error "Unsupported host OS for simulator MD5Builder"
+#endif
+
 class MD5Builder {
  public:
   MD5Builder() { memset(digest_, 0, sizeof(digest_)); }
 
-  void begin() { MD5_Init(&ctx_); }
+  void begin() {
+#if defined(__APPLE__)
+    CC_MD5_Init(&ctx_);
+#else
+    MD5_Init(&ctx_);
+#endif
+  }
 
-  void add(const uint8_t* data, size_t len) { MD5_Update(&ctx_, data, len); }
+  void add(const uint8_t* data, size_t len) {
+#if defined(__APPLE__)
+    CC_MD5_Update(&ctx_, data, static_cast<CC_LONG>(len));
+#else
+    MD5_Update(&ctx_, data, len);
+#endif
+  }
 
   void add(const char* str) {
     if (str) add(reinterpret_cast<const uint8_t*>(str), strlen(str));
   }
 
-  void calculate() { MD5_Final(digest_, &ctx_); }
+  void calculate() {
+#if defined(__APPLE__)
+    CC_MD5_Final(digest_, &ctx_);
+#else
+    MD5_Final(digest_, &ctx_);
+#endif
+  }
 
   String toString() const {
     char hex[33];
@@ -39,6 +55,10 @@ class MD5Builder {
   }
 
  private:
+#if defined(__APPLE__)
+  CC_MD5_CTX ctx_{};
+#else
   MD5_CTX ctx_{};
+#endif
   uint8_t digest_[16];
 };
