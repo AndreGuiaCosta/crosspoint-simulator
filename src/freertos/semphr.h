@@ -2,11 +2,15 @@
 #include <mutex>
 
 #include "FreeRTOS.h"
+#include "task.h"  // for xTaskGetCurrentTaskHandle
 
 // Use a real recursive mutex for the rendering semaphore.
 struct SimMutex {
   std::recursive_mutex mtx;
-  // Track "holder" for xSemaphoreGetMutexHolder compatibility (not thread-safe, good enough for simulator)
+  // Track "holder" so xSemaphoreGetMutexHolder mirrors FreeRTOS semantics —
+  // the firmware uses this to assert that a task isn't trying to wait on
+  // its own RenderLock. Not strictly thread-safe but good enough for the
+  // simulator (only updated by the lock-owning thread).
   TaskHandle_t holder = nullptr;
 };
 typedef SimMutex* SemaphoreHandle_t;
@@ -16,6 +20,11 @@ inline SemaphoreHandle_t xSemaphoreCreateMutex() { return new SimMutex(); }
 inline bool xSemaphoreTake(SemaphoreHandle_t sem, uint32_t /*ticksToWait*/) {
   if (!sem) return true;
   sem->mtx.lock();
+  // Record the holder AFTER acquiring the lock. Without this, the firmware's
+  // `mutexHolder == currTaskHandler` check in requestUpdateAndWait() compares
+  // nullptr == nullptr (main thread has no task handle, holder was never
+  // updated) and trips a spurious assertion.
+  sem->holder = xTaskGetCurrentTaskHandle();
   return true;
 }
 

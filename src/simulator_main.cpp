@@ -2,20 +2,40 @@
 #include <SDL2/SDL.h>
 #include <unistd.h>
 
+#include <thread>
+
 #include "Arduino.h"
 #include "HalDisplay.h"
+#include "ScriptDriver.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
 extern void setup();
 extern void loop();
 extern HalDisplay display;  // defined in main.cpp
 
 int main(int argc, char** argv) {
+  // Give the main thread its own task handle so xTaskGetCurrentTaskHandle()
+  // returns non-null. The firmware's `requestUpdateAndWait()` compares the
+  // mutex holder against the current task to detect render-lock self-deadlock;
+  // without this, both sides would be nullptr and the assertion would fail
+  // spuriously the first time a non-render-task path tries to wait for a render.
+  static SimTaskHandle mainTaskHandle;
+  mainTaskHandle.id = std::this_thread::get_id();
+  tl_currentTaskHandle = &mainTaskHandle;
+
+  // Parse `--script <path>` before setup() so any boot-time logs are
+  // captured by the driver's `expect` ring buffer.
+  ScriptDriver::init(argc, argv);
   setup();
   while (!display.shouldQuit()) {
     loop();
     // SDL must be driven from the main thread on macOS.
     // The render task writes pixels and sets pendingPresent; we flush them here.
     display.presentIfNeeded();
+    // Drive script commands AFTER present so screenshots see the rendered
+    // frame, not the previous one.
+    ScriptDriver::tick();
     // Yield to the OS so macOS delivers pending keyboard/window events to SDL.
     // Without this, the tight spin-loop starves the Cocoa event system and key
     // presses are only picked up sporadically. 1 ms also caps the loop at ~1 kHz,
