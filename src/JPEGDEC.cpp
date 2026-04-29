@@ -1,5 +1,6 @@
 #include "JPEGDEC.h"
 
+#include <algorithm>
 #include <cstdio>
 #include <cstring>
 #include <csetjmp>
@@ -10,9 +11,8 @@ extern "C" {
 
 namespace {
 
-// libjpeg's default error handler calls exit() on a fatal error, which would
-// take down the whole simulator. Replace error_exit with a longjmp so we can
-// fail the open/decode cleanly.
+// libjpeg's default error_exit calls exit() — replace with longjmp so a bad
+// JPEG fails cleanly instead of taking down the simulator.
 struct CrosspointJpegError {
   struct jpeg_error_mgr pub;
   jmp_buf jmp;
@@ -20,8 +20,6 @@ struct CrosspointJpegError {
 
 void crosspointJpegErrorExit(j_common_ptr cinfo) {
   auto* err = reinterpret_cast<CrosspointJpegError*>(cinfo->err);
-  // Suppress libjpeg's stderr spam in CI/sim runs — the firmware-side caller
-  // already logs a friendly "JPEG decode failed" message.
   longjmp(err->jmp, 1);
 }
 
@@ -51,9 +49,6 @@ int JPEGDEC::open(const char* filename, JPEG_OPEN_CALLBACK openCb, JPEG_CLOSE_CA
     return 0;
   }
 
-  // Slurp the whole file via the supplied callbacks. The on-device library
-  // streams from flash through these same hooks; on the host we trade a few
-  // MB of RAM for a much simpler libjpeg wiring.
   bytes_.resize(static_cast<size_t>(size));
   JPEGFILE jf{handle, 0, size};
   if (seekCb(&jf, 0) < 0) {
@@ -75,9 +70,6 @@ int JPEGDEC::open(const char* filename, JPEG_OPEN_CALLBACK openCb, JPEG_CLOSE_CA
     return 0;
   }
 
-  // Read just the header to populate width/height. The full decompress pass
-  // happens in decode(); we keep `bytes_` around so we can rerun libjpeg on
-  // the same buffer without re-reading the file.
   jpeg_decompress_struct cinfo;
   CrosspointJpegError jerr;
   std::memset(&cinfo, 0, sizeof(cinfo));
@@ -104,7 +96,9 @@ int JPEGDEC::open(const char* filename, JPEG_OPEN_CALLBACK openCb, JPEG_CLOSE_CA
   height_ = static_cast<int>(cinfo.image_height);
   jpeg_destroy_decompress(&cinfo);
 
-  if (width_ <= 0 || height_ <= 0) {
+  // Cap so a malformed/huge JPEG can't OOM the host.
+  constexpr int MAX_DIM = 8192;
+  if (width_ <= 0 || height_ <= 0 || width_ > MAX_DIM || height_ > MAX_DIM) {
     bytes_.clear();
     lastError_ = -1;
     return 0;
@@ -133,8 +127,7 @@ int JPEGDEC::decode(int /*x*/, int /*y*/, int /*options*/) {
   jerr.pub.error_exit = crosspointJpegErrorExit;
   jerr.pub.output_message = crosspointJpegOutputMessage;
 
-  // Decoded image (grayscale, full resolution). Allocated outside the
-  // setjmp scope so the longjmp path can free it via the destructor.
+  // Declared outside the setjmp scope so the longjmp path frees it cleanly.
   std::vector<uint8_t> image;
 
   if (setjmp(jerr.jmp)) {
@@ -150,9 +143,6 @@ int JPEGDEC::decode(int /*x*/, int /*y*/, int /*options*/) {
     lastError_ = -1;
     return 0;
   }
-  // Force libjpeg to do the colorspace conversion for us — covers stored as
-  // colour JPEGs come out as a single grayscale plane that maps directly onto
-  // the firmware's MCU buffer (which expects 8-bit grayscale).
   cinfo.out_color_space = JCS_GRAYSCALE;
   jpeg_start_decompress(&cinfo);
 
@@ -171,16 +161,12 @@ int JPEGDEC::decode(int /*x*/, int /*y*/, int /*options*/) {
   jpeg_finish_decompress(&cinfo);
   jpeg_destroy_decompress(&cinfo);
 
-  // Re-emit as 16x16 blocks (a JPEG MCU upper bound) so callers written
-  // against the streaming JPEGDEC contract see the expected callback shape.
-  // Stride is fixed at BLOCK; iWidthUsed/iHeight shrink at the right and
-  // bottom edges. Order is left-to-right, top-to-bottom — JpegToBmpConverter
-  // depends on that to flush MCU rows.
+  // JpegToBmpConverter assumes left-to-right, top-to-bottom MCU order.
   uint8_t blockBuf[BLOCK * BLOCK];
   for (int by = 0; by < outH; by += BLOCK) {
-    const int blockH = (outH - by) < BLOCK ? (outH - by) : BLOCK;
+    const int blockH = std::min(BLOCK, outH - by);
     for (int bx = 0; bx < outW; bx += BLOCK) {
-      const int blockW = (outW - bx) < BLOCK ? (outW - bx) : BLOCK;
+      const int blockW = std::min(BLOCK, outW - bx);
       std::memset(blockBuf, 0, sizeof(blockBuf));
       for (int r = 0; r < blockH; r++) {
         std::memcpy(blockBuf + r * BLOCK, image.data() + static_cast<size_t>(by + r) * outW + bx,
