@@ -8,6 +8,7 @@
 #include <cerrno>
 #include <cstdio>
 #include <cstring>
+#include <limits>
 #include <vector>
 
 HalStorage HalStorage::instance;
@@ -68,7 +69,8 @@ void HalFile::flush() {
     fsync(impl->fd);
 }
 bool HalFile::sync() {
-  if (!impl || impl->fd < 0) return false;
+  if (!impl || impl->fd < 0)
+    return false;
   return fsync(impl->fd) == 0;
 }
 size_t HalFile::getName(char *name, size_t len) {
@@ -91,10 +93,18 @@ size_t HalFile::size() {
   return end < 0 ? 0 : (size_t)end;
 }
 size_t HalFile::fileSize() { return size(); }
+uint64_t HalFile::fileSize64() { return size(); }
 bool HalFile::seek(size_t pos) {
   if (!impl || impl->fd < 0)
     return false;
   return lseek(impl->fd, (off_t)pos, SEEK_SET) >= 0;
+}
+bool HalFile::seek64(uint64_t pos) {
+  if (!impl || impl->fd < 0)
+    return false;
+  if (pos > static_cast<uint64_t>(std::numeric_limits<off_t>::max()))
+    return false;
+  return lseek(impl->fd, static_cast<off_t>(pos), SEEK_SET) >= 0;
 }
 bool HalFile::seekCur(int64_t offset) {
   if (!impl || impl->fd < 0)
