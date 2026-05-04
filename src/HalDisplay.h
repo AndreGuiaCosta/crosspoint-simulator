@@ -66,7 +66,7 @@ public:
   void setSimulatorOrientation(int orientation);
   // Simulator only: call from main thread to push rendered pixels to SDL.
   void presentIfNeeded();
-  // Simulator only: returns true once the window close button has been clicked.
+  // Simulator only: returns true once a hard shutdown has been requested.
   bool shouldQuit() const;
 
 private:

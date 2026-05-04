@@ -9,18 +9,21 @@ Handles two things automatically when this lib is included as a lib_dep:
    simulator. Replaced with uint32_t, which is the correct explicit size on both
    platforms. Applied idempotently — safe to run on every build.
 
-2. Registers a "run_simulator" custom target so the compiled binary can be
-   launched directly from PlatformIO.
+2. Registers a backward-compatible "run_simulator" custom target.
 
-Important limitation: when this file is loaded only through library.json as a
-library build hook, PlatformIO CLI can use the target, but the consuming
-project's IDE task list may not show it. To expose "Run Simulator" in the
-PlatformIO IDE UI, the consuming firmware repo still needs a tiny project-level
-post: extra_script pointing at this file inside .pio/libdeps/$PIOENV/simulator.
+This file can be loaded more than once in the same PlatformIO process:
+- once from this library's `library.json` build hook
+- again from a consuming firmware repo's `post:` extra_script for IDE task exposure
+
+Use a process-wide sentinel so the custom target is registered only once even
+when both paths load the script.
 """
 
 Import("env")
-import os, subprocess
+import os
+import builtins
+
+RUN_SIMULATOR_TARGET_KEY = "_crosspoint_run_simulator_target_registered"
 
 
 # --- BookMetadataCache patch ---
@@ -104,15 +107,19 @@ _patch_book_metadata_cache(env)
 # --- run_simulator custom target ---
 
 def _run_simulator(source, target, env):
+    import subprocess
+
     binary = env.subst("$BUILD_DIR/program")
     subprocess.run([binary], cwd=os.getcwd())
 
 
-env.AddCustomTarget(
-    name="run_simulator",
-    dependencies=None,
-    actions=_run_simulator,
-    title="Run Simulator",
-    description="Build and run the desktop simulator",
-    always_build=True,
-)
+if not getattr(builtins, RUN_SIMULATOR_TARGET_KEY, False):
+    setattr(builtins, RUN_SIMULATOR_TARGET_KEY, True)
+    env.AddCustomTarget(
+        name="run_simulator",
+        dependencies=None,
+        actions=_run_simulator,
+        title="Run Simulator",
+        description="Build and run the desktop simulator",
+        always_build=True,
+    )
