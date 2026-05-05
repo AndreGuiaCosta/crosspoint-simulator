@@ -37,26 +37,30 @@ No scripts need to be copied into the firmware repo for the simulator to build. 
 
 If you only want a self-contained simulator dependency, stop there.
 
-If you also want the `Run Simulator` task to appear in the upstream repo's PlatformIO IDE task list (under the "Custom" folder), add one project-level hook in the consuming firmware repo:
+If you also want the `Run Simulator` task to appear in the consuming repo's PlatformIO IDE task list (under the "Custom" folder), let the consuming project own the IDE task registration. Add `custom_run_simulator_target_owner = project` to `[env:simulator]`, then add one project-level hook:
 
 For a normal fetched dependency:
 
 ```ini
+custom_run_simulator_target_owner = project
+
 extra_scripts =
   pre:scripts/gen_i18n.py
   pre:scripts/git_branch.py
   pre:scripts/build_html.py
-  post:.pio/libdeps/$PIOENV/simulator/run_simulator.py # <-- add this line
+  post:.pio/libdeps/$PIOENV/simulator/run_simulator_project.py
 ```
 
 For a local symlinked dependency:
 
 ```ini
+custom_run_simulator_target_owner = project
+
 extra_scripts =
   pre:scripts/gen_i18n.py
   pre:scripts/git_branch.py
   pre:scripts/build_html.py
-  post:../crosspoint-simulator/run_simulator.py # <-- add this line
+  post:../crosspoint-simulator/run_simulator_project.py
 ```
 
 Use the symlink form only when the `Crosspoint` repo and this `crosspoint-simulator` repo are checked out side by side and your `lib_deps` entry is:
@@ -65,7 +69,11 @@ Use the symlink form only when the `Crosspoint` repo and this `crosspoint-simula
 simulator=symlink://../crosspoint-simulator
 ```
 
-That one `post:` line only exposes the task in the consuming project UI. The actual logic still lives in this simulator repo.
+The `custom_run_simulator_target_owner = project` line tells the library-side hook not to register the same launcher a second time. Without that, closing one simulator window can immediately relaunch another because both the library hook and the project hook try to own `run_simulator`.
+
+Do not point `post:` at `run_simulator.py` directly. That file is already auto-loaded via `library.json` and is the backward-compatible library hook.
+
+The `post:` line above only exposes the task in the consuming project UI. The actual launcher logic still lives in this simulator repo.
 
 
 ## Setup
@@ -74,7 +82,7 @@ Place EPUB books at `./fs_/books/` in the Crosspoint repo's root. This maps to t
 
 ## Build and run
 
-Run this command from the Crosspoint project after you have added the `[env:simulator]` config to Crosspoint's `platformio.ini` file. Alternatively, if you added the `post:` hook above, you can click "Build" from Platformio's IDE task list and then "Run Simulator" (nested under the "Custom" folder)
+Run this command from the Crosspoint project after you have added the `[env:simulator]` config to Crosspoint's `platformio.ini` file. Alternatively, if you added the project hook above, you can click "Build" from PlatformIO's IDE task list and then "Run Simulator" (nested under the "Custom" folder).
 
 ```bash
 pio run -e simulator -t run_simulator

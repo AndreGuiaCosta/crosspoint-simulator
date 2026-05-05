@@ -13,10 +13,11 @@ Handles two things automatically when this lib is included as a lib_dep:
 
 This file can be loaded more than once in the same PlatformIO process:
 - once from this library's `library.json` build hook
-- again from a consuming firmware repo's `post:` extra_script for IDE task exposure
+- again indirectly when a consuming firmware repo adds the separate
+  `run_simulator_project.py` helper for IDE task exposure
 
 Use a process-wide sentinel so the custom target is registered only once even
-when both paths load the script.
+when multiple registration paths exist.
 """
 
 Import("env")
@@ -24,6 +25,7 @@ import os
 import builtins
 
 RUN_SIMULATOR_TARGET_KEY = "_crosspoint_run_simulator_target_registered"
+RUN_SIMULATOR_TARGET_OWNER_OPTION = "custom_run_simulator_target_owner"
 
 
 # --- BookMetadataCache patch ---
@@ -113,11 +115,13 @@ def _run_simulator(source, target, env):
     subprocess.run([binary], cwd=os.getcwd())
 
 
-if not getattr(builtins, RUN_SIMULATOR_TARGET_KEY, False):
+target_owner = env.GetProjectOption(RUN_SIMULATOR_TARGET_OWNER_OPTION, "").strip().lower()
+
+if target_owner != "project" and not getattr(builtins, RUN_SIMULATOR_TARGET_KEY, False):
     setattr(builtins, RUN_SIMULATOR_TARGET_KEY, True)
     env.AddCustomTarget(
         name="run_simulator",
-        dependencies=None,
+        dependencies="$PROGPATH",
         actions=_run_simulator,
         title="Run Simulator",
         description="Build and run the desktop simulator",
