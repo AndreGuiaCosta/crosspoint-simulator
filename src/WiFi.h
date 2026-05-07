@@ -65,6 +65,7 @@ public:
   void setHostname(const char *) {}
   wifi_mode_t getMode() { return WIFI_MODE_STA; }
   void setSleep(bool) {}
+  void setAutoReconnect(bool) {}
   String getHostname() { return String("mock-hostname"); }
   int softAPgetStationNum() { return 0; }
 };
