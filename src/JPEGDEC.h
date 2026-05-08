@@ -55,7 +55,7 @@ public:
     drawCb_ = drawCb;
     lastError_ = 0;
 
-    if (!filename || !openCb || !closeCb || !readCb || !drawCb) {
+    if (!filename || !openCb || !closeCb || !readCb) {
       lastError_ = -1;
       return 0;
     }

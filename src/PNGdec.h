@@ -48,7 +48,7 @@ public:
     image_ = simulator_image::DecodedImage{};
     drawCb_ = drawCb;
 
-    if (!filename || !openCb || !closeCb || !readCb || !drawCb) {
+    if (!filename || !openCb || !closeCb || !readCb) {
       return PNG_INVALID_FILE;
     }
 
