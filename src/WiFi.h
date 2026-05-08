@@ -63,6 +63,7 @@ class WiFiClass {
   void setSleep(bool) {}
   String getHostname() { return String("mock-hostname"); }
   int softAPgetStationNum() { return 0; }
+  bool setAutoReconnect(bool) { return true; }
 };
 extern WiFiClass WiFi;
 
