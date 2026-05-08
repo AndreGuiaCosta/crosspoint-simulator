@@ -102,6 +102,12 @@ When the simulator is on the sleep screen, pressing any mapped simulator key wak
 
 ## Notes
 
+**Image previews**: The simulator decodes JPEG and PNG files on the host and
+renders a rough grayscale preview through the firmware's normal image callbacks.
+This is meant to make image pages and PNG sleep overlays visible while testing
+desktop flows. It does not simulate device-specific e-ink image quality,
+refresh behaviour, or memory pressure.
+
 **Cache**: On first open of an ebook, an "Indexing..." popup will appear while the section cache is built. If you see rendering issues after a code change that affects layout, delete `./fs_/.crosspoint/` to clear stale caches.
 
 > [!WARNING]

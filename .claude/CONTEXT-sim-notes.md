@@ -8,7 +8,7 @@ The repo ships as a PlatformIO library; downstream firmware adds it as a `lib_de
 
 ## Current State
 
-The simulator builds and runs on macOS and Linux/WSL. Portrait orientation is correct, gray shading renders cleanly at HiDPI, file browsing lists EPUBs from `./fs_/books/`, and reading a book shows the "Indexing..." popup on first open before rendering pages. Window close exits cleanly. Icons render in the UI (drawImage / drawImageTransparent are now implemented, not stubs). HalGPIO carries a DeviceType (X4 default, X3 selectable) so downstream code branching on device type compiles in the simulator.
+The simulator builds and runs on macOS and Linux/WSL. Portrait orientation is correct, gray shading renders cleanly at HiDPI, file browsing lists EPUBs from `./fs_/books/`, and reading a book shows the "Indexing..." popup on first open before rendering pages. Window close exits cleanly. Icons render in the UI (drawImage / drawImageTransparent are now implemented, not stubs). JPEG and PNG decoder shims render rough host-side previews for EPUB images and PNG sleep overlays. HalGPIO carries a DeviceType (X4 default, X3 selectable) so downstream code branching on device type compiles in the simulator.
 
 ## Setup
 
@@ -97,6 +97,10 @@ pio run -e simulator -t run_simulator
 ### Image rendering implemented (commit c19b64c, 2026-04-07)
 
 - `drawImage` and `drawImageTransparent` were no-op stubs; now they copy 1bpp packed image data into the framebuffer (drawImage = overwrite, drawImageTransparent = AND-mask). This makes UI icons visible.
+
+### Host-side image decoder previews (2026-05-08)
+
+- [src/JPEGDEC.h](src/JPEGDEC.h) and [src/PNGdec.h](src/PNGdec.h) now decode via vendored [src/stb_image.h](src/stb_image.h), then feed grayscale/RGBA rows through the same callback shape used by the embedded libraries. This is only a desktop preview path; it does not model e-ink waveforms, device memory pressure, or exact image quality.
 
 ### HalStorage menu-items fix (commit 40c578e, 2026-04-19)
 
