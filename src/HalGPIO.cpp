@@ -18,8 +18,10 @@ extern std::atomic<bool> quitRequested;
 //   BTN_UP      (4) → Up arrow
 //   BTN_DOWN    (5) → Down arrow
 //   BTN_POWER   (6) → P
+//   Simulator sleep shortcut → S
 
 static constexpr int NUM_BUTTONS = 7;
+static constexpr SDL_Scancode SIMULATOR_SLEEP_SCANCODE = SDL_SCANCODE_S;
 
 static const SDL_Scancode buttonScancode[NUM_BUTTONS] = {
     SDL_SCANCODE_ESCAPE, // BTN_BACK
@@ -34,6 +36,7 @@ static const SDL_Scancode buttonScancode[NUM_BUTTONS] = {
 static bool pressedThisFrame[NUM_BUTTONS] = {};
 static bool releasedThisFrame[NUM_BUTTONS] = {};
 static unsigned long buttonPressTime[NUM_BUTTONS] = {};
+static bool simulatorSleepRequested = false;
 
 static void clearButtonState() {
   for (int i = 0; i < NUM_BUTTONS; i++) {
@@ -73,6 +76,10 @@ void HalGPIO::update() {
     if (e.type == SDL_QUIT) {
       quitRequested.store(true);
     } else if (e.type == SDL_KEYDOWN && !e.key.repeat) {
+      if (e.key.keysym.scancode == SIMULATOR_SLEEP_SCANCODE) {
+        simulatorSleepRequested = true;
+        continue;
+      }
       int btn = scancodeToButton(e.key.keysym.scancode);
       if (btn >= 0) {
         pressedThisFrame[btn] = true;
@@ -135,6 +142,12 @@ unsigned long HalGPIO::getHeldTime() const {
     }
   }
   return maxHeld;
+}
+
+bool HalGPIO::consumeSimulatorSleepRequest() {
+  const bool requested = simulatorSleepRequested;
+  simulatorSleepRequested = false;
+  return requested;
 }
 
 HalGPIO::WakeupReason HalGPIO::getWakeupReason() const {

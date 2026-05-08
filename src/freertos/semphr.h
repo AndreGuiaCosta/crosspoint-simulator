@@ -2,6 +2,7 @@
 #include <mutex>
 
 #include "FreeRTOS.h"
+#include "task.h"
 
 // Use a real recursive mutex for the rendering semaphore.
 struct SimMutex {
@@ -9,6 +10,7 @@ struct SimMutex {
   // Track "holder" for xSemaphoreGetMutexHolder compatibility (not thread-safe,
   // good enough for simulator)
   TaskHandle_t holder = nullptr;
+  uint16_t holdCount = 0;
 };
 typedef SimMutex *SemaphoreHandle_t;
 
@@ -18,13 +20,20 @@ inline bool xSemaphoreTake(SemaphoreHandle_t sem, uint32_t /*ticksToWait*/) {
   if (!sem)
     return true;
   sem->mtx.lock();
+  sem->holder = xTaskGetCurrentTaskHandle();
+  sem->holdCount++;
   return true;
 }
 
 inline bool xSemaphoreGive(SemaphoreHandle_t sem) {
   if (!sem)
     return true;
-  sem->holder = nullptr;
+  if (sem->holdCount > 0) {
+    sem->holdCount--;
+  }
+  if (sem->holdCount == 0) {
+    sem->holder = nullptr;
+  }
   sem->mtx.unlock();
   return true;
 }

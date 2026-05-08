@@ -182,7 +182,7 @@ void HalDisplay::presentIfNeeded() {
 
 bool HalDisplay::shouldQuit() const { return quitRequested.load(); }
 
-void HalDisplay::deepSleep() {}
+void HalDisplay::deepSleep() { presentIfNeeded(); }
 
 uint8_t *HalDisplay::getFrameBuffer() const {
   static uint8_t buffer[HalDisplay::BUFFER_SIZE];

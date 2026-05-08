@@ -97,6 +97,7 @@ pio run -e simulator -t run_simulator
 | Return | Confirm / Select                   |
 | Escape | Back                               |
 | P      | Power                              |
+| S      | Simulate sleep                     |
 
 When the simulator is on the sleep screen, pressing any mapped simulator key wakes it. Under the hood the simulator relaunches itself and reports a synthetic power-button wake, because the native build has no real ESP deep-sleep resume path.
 
