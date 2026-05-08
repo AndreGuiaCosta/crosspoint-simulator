@@ -1,0 +1,31 @@
+# End-to-end Readest Library download. Assumes credentials are persisted.
+log download: start
+expect_timeout 30000
+expect Entering activity: Home
+wait 500
+
+# Lyra theme: recent[0] → 3 Downs → Readest Library.
+tap down
+tap down
+tap down
+wait 200
+
+tap confirm
+expect Entering activity: ReadestLibrary
+expect_timeout 60000
+expect library ready
+wait 500
+screenshot /screenshots/dl-01-list-cold.bmp
+
+tap confirm
+expect Entering activity: ReadestLibrary
+wait 200
+screenshot /screenshots/dl-02-downloading.bmp
+
+expect_timeout 180000
+expect Recorded download
+wait 500
+screenshot /screenshots/dl-03-after-download.bmp
+
+log download: complete
+quit
