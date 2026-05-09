@@ -7,6 +7,7 @@
 #include <map>
 #include <string>
 
+#include <dirent.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -92,6 +93,46 @@ inline bool readFile(const std::string &path, std::string &out) {
   return true;
 }
 
+inline bool isDirectory(const std::string &path) {
+  struct stat st {};
+  return stat(path.c_str(), &st) == 0 && S_ISDIR(st.st_mode);
+}
+
+inline bool findFileByBasename(const std::string &dir, const std::string &name,
+                               std::string &outPath, int depth = 0) {
+  if (depth > 5)
+    return false;
+
+  DIR *handle = opendir(dir.c_str());
+  if (!handle)
+    return false;
+
+  while (dirent *entry = readdir(handle)) {
+    std::string entryName = entry->d_name;
+    if (entryName == "." || entryName == "..")
+      continue;
+
+    std::string path = dir;
+    if (!path.empty() && path.back() != '/')
+      path += '/';
+    path += entryName;
+
+    if (entryName == name) {
+      outPath = path;
+      closedir(handle);
+      return true;
+    }
+
+    if (isDirectory(path) && findFileByBasename(path, name, outPath, depth + 1)) {
+      closedir(handle);
+      return true;
+    }
+  }
+
+  closedir(handle);
+  return false;
+}
+
 inline bool fetchFromFileUrl(const std::string &url, Response &out) {
   if (!startsWith(url, "file://"))
     return false;
@@ -125,7 +166,13 @@ inline bool fetchFromMockRoot(const std::string &url, Response &out) {
     path += '/';
   path += name;
 
-  if (readFile(path, out.body)) {
+  if (!readFile(path, out.body)) {
+    std::string nestedPath;
+    if (!findFileByBasename(root, name, nestedPath) || !readFile(nestedPath, out.body))
+      return false;
+  }
+
+  if (!out.body.empty()) {
     out.statusCode = 200;
     return true;
   }
