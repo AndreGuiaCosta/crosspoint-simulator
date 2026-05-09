@@ -10,7 +10,7 @@ A desktop simulator for [CrossPoint](https://github.com/crosspoint-reader/crossp
 
 ## Prerequisites
 
-SDL2 must be installed on the host machine. Linux/WSL users also need OpenSSL development headers for MD5 support.
+SDL2 and `curl` must be installed on the host machine. Linux/WSL users also need OpenSSL development headers for MD5 support.
 
 ```bash
 # macOS
@@ -102,6 +102,21 @@ pio run -e simulator -t run_simulator
 When the simulator is on the sleep screen, pressing any mapped simulator key wakes it. Under the hood the simulator relaunches itself and reports a synthetic power-button wake, because the native build has no real ESP deep-sleep resume path.
 
 ## Notes
+
+**Host-backed network flows**: OPDS/catalog downloads and KOReader sync use the
+host's `curl` binary through simulator implementations of `HTTPClient` and
+`esp_http_client`. This keeps the firmware code path intact while allowing the
+desktop build to reach real HTTP/HTTPS services.
+
+**File transfer**: The simulator provides a native host implementation of
+`CrossPointWebServer` on `http://127.0.0.1:8080/`. It supports the browser file
+manager plus common WebDAV-style `OPTIONS`, `PROPFIND`, `PUT`, `DELETE`,
+`MKCOL`, `MOVE`, and `COPY` requests. WebDAV `LOCK` and `UNLOCK` return an
+explicit unsupported response because the native server does not enforce locks.
+
+**Firmware updates**: OTA and SD-card firmware flashing are non-destructive in
+the simulator. The simulator stubs those update paths so the UI can be opened
+without flashing firmware or changing boot partitions.
 
 **Image previews**: The simulator decodes JPEG and PNG files on the host and
 renders a rough grayscale preview through the firmware's normal image callbacks.
