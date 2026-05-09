@@ -6,6 +6,20 @@
 // Thread-local pointer so ulTaskNotifyTake can find the current task's handle.
 inline thread_local SimTaskHandle *tl_currentTaskHandle = nullptr;
 
+inline SimTaskHandle *simMainTaskHandle() {
+  static SimTaskHandle mainTask;
+  static std::once_flag initFlag;
+  std::call_once(initFlag, [] {
+    mainTask.name = "main";
+    mainTask.id = std::this_thread::get_id();
+  });
+  return &mainTask;
+}
+
+inline TaskHandle_t xTaskGetCurrentTaskHandle() {
+  return tl_currentTaskHandle ? tl_currentTaskHandle : simMainTaskHandle();
+}
+
 // Create a real OS thread. The FreeRTOS task function signature is
 // void(*)(void*).
 inline int xTaskCreate(void (*fn)(void *), const char *name,
@@ -26,9 +40,7 @@ inline int xTaskCreate(void (*fn)(void *), const char *name,
 // Block until notified (simulates ulTaskNotifyTake with clear-on-exit).
 inline uint32_t ulTaskNotifyTake(int /*clearOnExit*/,
                                  uint32_t /*ticksToWait*/) {
-  auto *h = tl_currentTaskHandle;
-  if (!h)
-    return 1; // Not in a task thread, don't block
+  auto *h = xTaskGetCurrentTaskHandle();
   std::unique_lock<std::mutex> lk(h->mtx);
   h->cv.wait(lk, [h] { return h->notifyCount > 0; });
   h->notifyCount--;
@@ -48,10 +60,9 @@ inline void xTaskNotify(TaskHandle_t handle, uint32_t /*value*/,
   handle->cv.notify_one();
 }
 
-inline TaskHandle_t xTaskGetCurrentTaskHandle() { return tl_currentTaskHandle; }
 inline const char *pcTaskGetName(TaskHandle_t h) {
   if (!h)
-    h = tl_currentTaskHandle;
+    h = xTaskGetCurrentTaskHandle();
   return h ? h->name : "main";
 }
 inline void vTaskDelete(TaskHandle_t h) {
