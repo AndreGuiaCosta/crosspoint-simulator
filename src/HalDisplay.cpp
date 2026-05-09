@@ -1,7 +1,7 @@
 #include "HalDisplay.h"
 
 #include <GfxRenderer.h>
-#include <SDL2/SDL.h>
+#include <SDL.h>
 
 #include <atomic>
 #include <cstring>
