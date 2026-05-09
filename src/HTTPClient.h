@@ -1,12 +1,9 @@
 #pragma once
 
-#include <array>
-#include <cstdio>
-#include <cstdlib>
 #include <map>
-#include <memory>
 #include <string>
 
+#include "SimHttpFetch.h"
 #include "Stream.h"
 #include "WString.h"
 
@@ -70,54 +67,16 @@ class HTTPClient {
   String responseBody_;
   int statusCode_ = 0;
 
-  static std::string shellQuote(const std::string &value) {
-    std::string out = "'";
-    for (char c : value) {
-      if (c == '\'')
-        out += "'\\''";
-      else
-        out += c;
-    }
-    out += "'";
-    return out;
-  }
-
   int perform(const char *method, const char *body) {
     if (url_.empty())
       return 0;
 
-    std::string cmd =
-        "curl -L -sS --connect-timeout 10 --max-time 60 -w '\\n%{http_code}'";
-    if (method && std::string(method) != "GET")
-      cmd += " -X " + shellQuote(method);
-    for (const auto &header : headers_) {
-      cmd += " -H " + shellQuote(header.first + ": " + header.second);
-    }
-    if (!basicAuth_.empty())
-      cmd += " -u " + shellQuote(basicAuth_);
-    if (body) {
-      cmd += " --data-binary " + shellQuote(body);
-    }
-    cmd += " " + shellQuote(url_);
-
-    FILE *pipe = popen(cmd.c_str(), "r");
-    if (!pipe)
+    sim_http_fetch::Response response;
+    if (!sim_http_fetch::fetch(url_, method, headers_, basicAuth_, body, response))
       return 0;
 
-    std::string response;
-    std::array<char, 4096> buffer{};
-    while (fgets(buffer.data(), static_cast<int>(buffer.size()), pipe)) {
-      response += buffer.data();
-    }
-    const int rc = pclose(pipe);
-    if (rc != 0 && response.empty())
-      return 0;
-
-    const size_t nl = response.rfind('\n');
-    if (nl == std::string::npos)
-      return 0;
-    responseBody_ = response.substr(0, nl);
-    statusCode_ = std::atoi(response.substr(nl + 1).c_str());
+    responseBody_ = response.body;
+    statusCode_ = response.statusCode;
     return statusCode_;
   }
 };

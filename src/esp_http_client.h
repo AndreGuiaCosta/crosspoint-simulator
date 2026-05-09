@@ -1,13 +1,11 @@
 #pragma once
 
-#include <array>
-#include <cstdio>
-#include <cstdlib>
 #include <cstring>
 #include <map>
 #include <string>
 
 #include "esp_err.h"
+#include "SimHttpFetch.h"
 
 enum http_event { HTTP_EVENT_ON_DATA };
 
@@ -52,18 +50,6 @@ struct SimEspHttpClient {
 };
 
 namespace sim_http_client_detail {
-inline std::string shellQuote(const std::string &value) {
-  std::string out = "'";
-  for (char c : value) {
-    if (c == '\'')
-      out += "'\\''";
-    else
-      out += c;
-  }
-  out += "'";
-  return out;
-}
-
 inline const char *methodName(esp_http_client_method_t method) {
   switch (method) {
   case HTTP_METHOD_POST:
@@ -128,45 +114,21 @@ inline esp_err_t esp_http_client_perform(esp_http_client_handle_t handle) {
 
   using namespace sim_http_client_detail;
 
-  std::string cmd =
-      "curl -L -sS --connect-timeout 10 --max-time 60 -w '\\n%{http_code}'";
   const char *method = methodName(handle->config.method);
-  if (std::strcmp(method, "GET") != 0)
-    cmd += " -X " + shellQuote(method);
-  for (const auto &header : handle->headers) {
-    cmd += " -H " + shellQuote(header.first + ": " + header.second);
-  }
-  if (!handle->postField.empty())
-    cmd += " --data-binary " + shellQuote(handle->postField);
-  cmd += " " + shellQuote(handle->config.url);
-
-  FILE *pipe = popen(cmd.c_str(), "r");
-  if (!pipe)
+  sim_http_fetch::Response response;
+  if (!sim_http_fetch::fetch(handle->config.url, method, handle->headers, "",
+                             handle->postField.empty() ? nullptr : handle->postField.c_str(), response))
     return ESP_FAIL;
 
-  std::string response;
-  std::array<char, 4096> buffer{};
-  while (fgets(buffer.data(), static_cast<int>(buffer.size()), pipe)) {
-    response += buffer.data();
-  }
-  const int rc = pclose(pipe);
-  if (rc != 0 && response.empty())
-    return ESP_FAIL;
+  handle->statusCode = response.statusCode;
+  handle->contentLength = static_cast<int>(response.body.size());
 
-  const size_t nl = response.rfind('\n');
-  if (nl == std::string::npos)
-    return ESP_FAIL;
-
-  std::string body = response.substr(0, nl);
-  handle->statusCode = std::atoi(response.substr(nl + 1).c_str());
-  handle->contentLength = static_cast<int>(body.size());
-
-  if (handle->config.event_handler && !body.empty()) {
+  if (handle->config.event_handler && !response.body.empty()) {
     esp_http_client_event_t event{};
     event.event_id = HTTP_EVENT_ON_DATA;
     event.client = handle;
-    event.data = const_cast<char *>(body.data());
-    event.data_len = static_cast<int>(body.size());
+    event.data = const_cast<char *>(response.body.data());
+    event.data_len = static_cast<int>(response.body.size());
     event.user_data = handle->config.user_data;
     handle->config.event_handler(&event);
   }

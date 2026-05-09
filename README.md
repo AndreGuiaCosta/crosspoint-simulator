@@ -108,6 +108,26 @@ host's `curl` binary through simulator implementations of `HTTPClient` and
 `esp_http_client`. This keeps the firmware code path intact while allowing the
 desktop build to reach real HTTP/HTTPS services.
 
+**Mocked downloads**: Set `CROSSPOINT_SIM_HTTP_MOCK_ROOT` to a folder of local
+fixtures to make host-backed HTTP requests return local files by basename before
+falling back to the real network. This is useful for SD-font testing because the
+firmware can request its normal release URLs while the simulator serves a local
+`fonts.json` and `.cpfont` files:
+
+```bash
+cd /path/to/firmware
+python3 -m pip install -r lib/EpdFont/scripts/requirements.txt
+python3 lib/EpdFont/scripts/build-sd-fonts.py \
+  --only NotoSansExtended \
+  --manifest \
+  --base-url "https://github.com/crosspoint-reader/crosspoint-fonts/releases/download/local/"
+CROSSPOINT_SIM_HTTP_MOCK_ROOT="$PWD/lib/EpdFont/scripts/output" \
+  pio run -e simulator -t run
+```
+
+The mock still uses the firmware's normal manifest parsing, file download,
+write-to-SD, `.cpfont` validation, registry refresh, and font-selection flow.
+
 **File transfer**: The simulator provides a native host implementation of
 `CrossPointWebServer` on `http://127.0.0.1:8080/`. It supports the browser file
 manager plus common WebDAV-style `OPTIONS`, `PROPFIND`, `PUT`, `DELETE`,
