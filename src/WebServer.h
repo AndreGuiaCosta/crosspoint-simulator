@@ -1,5 +1,6 @@
 #pragma once
 #include <functional>
+#include <memory>
 
 #include "NetworkClient.h"
 #include "WString.h"
@@ -67,47 +68,49 @@ public:
 
 class WebServer {
 public:
-  WebServer(int port) {}
-  void begin() {}
-  void handleClient() {}
-  void on(const char *uri, int method, std::function<void()> handler) {}
+  WebServer(int port);
+  ~WebServer();
+  void begin();
+  void handleClient();
+  void on(const char *uri, int method, std::function<void()> handler);
   void on(const char *uri, int method, std::function<void()> handler,
-          std::function<void()> uploadHandler) {}
-  void onNotFound(std::function<void()> handler) {}
-  void collectHeaders(const char **headers, size_t count) {}
-  void stop() {}
-  void addHandler(RequestHandler *handler) {}
-  void send(int code, const char *content_type, const char *content) {}
+          std::function<void()> uploadHandler);
+  void onNotFound(std::function<void()> handler);
+  void collectHeaders(const char **headers, size_t count);
+  void stop();
+  void addHandler(RequestHandler *handler);
+  void send(int code, const char *content_type, const char *content);
   void send(int code, const char *content_type, const String &content) {
     send(code, content_type, content.c_str());
   }
   void send(int code) { send(code, "text/plain", ""); }
   void send_P(int code, const char *content_type, const char *content,
-              size_t len) {}
-  void sendHeader(const char *name, const char *value, bool first = false) {}
+              size_t len);
+  void sendHeader(const char *name, const char *value, bool first = false);
   void sendHeader(const char *name, const String &value, bool first = false) {
     sendHeader(name, value.c_str(), first);
   }
-  void sendContent(const String &content) {}
-  void sendContent(const char *content) {}
-  void setContentLength(size_t len) {}
-  int method() { return HTTP_GET; }
-  String uri() { return "/"; }
-  bool hasArg(const char *name) { return false; }
-  String arg(const char *name) { return String(""); }
-  String arg(int i) { return String(""); }
-  int args() { return 0; }
-  String argName(int i) { return String(""); }
-  String header(const char *name) { return String(""); }
-  String header(int i) { return String(""); }
-  String headerName(int i) { return String(""); }
-  int headers() { return 0; }
-  bool hasHeader(const char *name) { return false; }
-  static String urlDecode(const String &str) { return str; }
-  NetworkClient client() { return NetworkClient(); }
-  long clientContentLength() { return 0; }
-  HTTPUpload &upload() {
-    static HTTPUpload u;
-    return u;
-  }
+  void sendContent(const String &content);
+  void sendContent(const char *content);
+  void setContentLength(size_t len);
+  int method();
+  String uri();
+  bool hasArg(const char *name);
+  String arg(const char *name);
+  String arg(int i);
+  int args();
+  String argName(int i);
+  String header(const char *name);
+  String header(int i);
+  String headerName(int i);
+  int headers();
+  bool hasHeader(const char *name);
+  static String urlDecode(const String &str);
+  NetworkClient client();
+  long clientContentLength();
+  HTTPUpload &upload();
+
+private:
+  struct Impl;
+  std::unique_ptr<Impl> impl_;
 };
