@@ -1,73 +1,82 @@
 #pragma once
 
-#include <cstddef>
-#include <cstdint>
+#include <map>
 #include <string>
-#include <vector>
 
+#include "SimHttpFetch.h"
+#include "Stream.h"
 #include "WString.h"
 
 class NetworkClient;
-class Stream;
 
-// Constants the firmware passes to HTTPClient. The numeric values are
-// arbitrary in the simulator — only setFollowRedirects branches on the
-// "off" sentinel below.
-enum {
-  HTTPC_DISABLE_FOLLOW_REDIRECTS = 0,
-  HTTPC_STRICT_FOLLOW_REDIRECTS = 1,
-  HTTPC_FORCE_FOLLOW_REDIRECTS = 2,
-  HTTP_CODE_OK = 200,
-};
+enum { HTTPC_STRICT_FOLLOW_REDIRECTS, HTTP_CODE_OK = 200 };
 
-/**
- * libcurl-backed Arduino-ESP32 HTTPClient stand-in for the simulator.
- *
- * Mirrors the subset of the real API the firmware uses (begin/addHeader/
- * GET/POST/PUT/getString/getSize/writeToStream/end). HTTP and HTTPS are
- * both routed through libcurl; the NetworkClient* passed to begin() is
- * inspected only to honour setInsecure() on the secure variant.
- *
- * Negative return codes from GET/POST/PUT mirror the firmware contract:
- * callers (e.g. ReadestAuthClient) test `code < 0` to detect transport
- * failures rather than HTTP error responses.
- */
 class HTTPClient {
  public:
-  HTTPClient() = default;
-  ~HTTPClient() { end(); }
+  HTTPClient() {}
+  ~HTTPClient() {}
 
-  void begin(NetworkClient& client, const char* url);
-  void setFollowRedirects(int mode) { followRedirects = (mode != HTTPC_DISABLE_FOLLOW_REDIRECTS); }
-  void addHeader(const char* name, const String& value) { addHeader(name, value.c_str()); }
-  void addHeader(const char* name, const char* value);
-  void setAuthorization(const char* user, const char* pass);
-  void setConnectTimeout(int32_t timeoutMs) { connectTimeoutMs = timeoutMs; }
-  void setTimeout(uint16_t timeoutMs) { readTimeoutMs = timeoutMs; }
+  void begin(NetworkClient &client, const char *url) {
+    (void)client;
+    url_ = url ? url : "";
+    responseBody_.s.clear();
+    statusCode_ = 0;
+  }
+  void setFollowRedirects(int mode) {}
+  void addHeader(const char *name, const String &value) {
+    if (name)
+      headers_[name] = value.c_str();
+  }
+  void addHeader(const char *name, const char *value) {
+    if (name)
+      headers_[name] = value ? value : "";
+  }
+  void setAuthorization(const char *user, const char *pass) {
+    if (user && pass)
+      basicAuth_ = std::string(user) + ":" + pass;
+  }
 
-  int GET();
-  int POST();
-  int POST(const char* body);
-  int PUT(const char* body);
-  int PUT(const String& body) { return PUT(body.c_str()); }
+  int GET() { return perform("GET", nullptr); }
+  int POST() { return perform("POST", ""); }
+  int POST(const char *body) { return perform("POST", body ? body : ""); }
+  int PUT(const char *body) { return perform("PUT", body ? body : ""); }
+  int PUT(const String &body) { return perform("PUT", body.c_str()); }
 
-  String getString() const { return String(responseBody); }
-  int getSize() const { return static_cast<int>(responseBody.size()); }
-  // Replays the buffered response body to a Stream. Returns bytes written,
-  // or a negative value if no response is available.
-  int writeToStream(Stream* stream);
+  String getString() { return responseBody_; }
+  int getSize() { return static_cast<int>(responseBody_.length()); }
+  int writeToStream(Stream *stream) {
+    if (!stream)
+      return 0;
+    return static_cast<int>(
+        stream->write(reinterpret_cast<const uint8_t *>(responseBody_.c_str()),
+                      responseBody_.length()));
+  }
 
-  void end();
+  void end() {
+    url_.clear();
+    headers_.clear();
+    basicAuth_.clear();
+    responseBody_ = "";
+    statusCode_ = 0;
+  }
 
  private:
-  int perform(const char* method, const char* body, size_t bodyLen);
+  std::string url_;
+  std::map<std::string, std::string> headers_;
+  std::string basicAuth_;
+  String responseBody_;
+  int statusCode_ = 0;
 
-  std::string url;
-  std::vector<std::string> headers;  // Stored as "Name: value" lines for curl_slist.
-  std::string userPwd;               // Empty unless setAuthorization was called.
-  std::string responseBody;
-  bool insecure = false;
-  bool followRedirects = false;
-  int32_t connectTimeoutMs = 0;  // 0 = libcurl default.
-  int32_t readTimeoutMs = 0;     // 0 = libcurl default.
+  int perform(const char *method, const char *body) {
+    if (url_.empty())
+      return 0;
+
+    sim_http_fetch::Response response;
+    if (!sim_http_fetch::fetch(url_, method, headers_, basicAuth_, body, response))
+      return 0;
+
+    responseBody_ = response.body;
+    statusCode_ = response.statusCode;
+    return statusCode_;
+  }
 };
