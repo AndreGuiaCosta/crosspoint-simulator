@@ -13,10 +13,18 @@ OtaUpdater::OtaUpdaterError OtaUpdater::checkForUpdate() {
   return NO_UPDATE;
 }
 
-OtaUpdater::OtaUpdaterError OtaUpdater::installUpdate(ProgressCallback onProgress, void* ctx) {
+OtaUpdater::OtaUpdaterError OtaUpdater::installUpdate(ProgressCallback onProgress, void* ctx
+#ifdef CROSSINK_VERSION
+                                                       ,
+                                                       std::atomic<bool>* cancelRequested
+#endif
+) {
   LOG_DBG("OTA", "[EMU] OTA install is not supported in the native emulator");
   processedSize = 1;
   totalSize = 1;
   if (onProgress) onProgress(ctx);
+#ifdef CROSSINK_VERSION
+  if (cancelRequested && cancelRequested->load()) return CANCELLED_ERROR;
+#endif
   return INTERNAL_UPDATE_ERROR;
 }
