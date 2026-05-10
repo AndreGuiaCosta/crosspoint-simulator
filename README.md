@@ -128,11 +128,15 @@ CROSSPOINT_SIM_HTTP_MOCK_ROOT="$PWD/lib/EpdFont/scripts/output" \
 The mock still uses the firmware's normal manifest parsing, file download,
 write-to-SD, `.cpfont` validation, registry refresh, and font-selection flow.
 
-**File transfer**: The simulator provides a native host implementation of
-`CrossPointWebServer` on `http://127.0.0.1:8080/`. It supports the browser file
-manager plus common WebDAV-style `OPTIONS`, `PROPFIND`, `PUT`, `DELETE`,
-`MKCOL`, `MOVE`, and `COPY` requests. WebDAV `LOCK` and `UNLOCK` return an
-explicit unsupported response because the native server does not enforce locks.
+**File transfer**: The simulator provides host-backed `WebServer`,
+`WebSocketsServer`, and `NetworkClient` shims so firmware-owned file-transfer
+routes can run on the host. Firmware web servers that bind port 80 are exposed
+on `http://127.0.0.1:8080/`; WebSocket servers that bind port 81 are exposed on
+`ws://127.0.0.1:8081/`. This supports the browser file manager, WebSocket upload
+progress, streamed downloads, and common WebDAV-style requests such as
+`OPTIONS`, `PROPFIND`, `PUT`, `DELETE`, `MKCOL`, `MOVE`, and `COPY`. WebDAV
+`LOCK` and `UNLOCK` remain compatibility-only unless the firmware implements
+locking semantics.
 
 **Firmware updates**: OTA and SD-card firmware flashing are non-destructive in
 the simulator. The simulator stubs those update paths so the UI can be opened
