@@ -35,6 +35,10 @@ class HTTPClient {
     if (user && pass)
       basicAuth_ = std::string(user) + ":" + pass;
   }
+  // No-ops: sim_http_fetch is synchronous; timeouts are firmware-side hints
+  // that don't translate to the host curl/WSL stack.
+  void setConnectTimeout(int) {}
+  void setTimeout(int) {}
 
   int GET() { return perform("GET", nullptr); }
   int POST() { return perform("POST", ""); }
