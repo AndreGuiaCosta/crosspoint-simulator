@@ -13,7 +13,7 @@ public:
   NetworkClient() {}
   explicit NetworkClient(int fd);
   virtual ~NetworkClient() {}
-  virtual int connect(const char *host, uint16_t port) { return 1; }
+  virtual int connect(const char *host, uint16_t port);
   virtual size_t write(const uint8_t *buf, size_t size);
   virtual size_t write(const char *str) {
     return write((const uint8_t *)str, strlen(str));

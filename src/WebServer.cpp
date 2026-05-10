@@ -354,6 +354,23 @@ struct WebServer::Impl {
     }
   }
 
+  void emitMultipartAbort() {
+    for (const auto &route : routes) {
+      if (!route.uploadHandler)
+        continue;
+      if (route.uri != currentUri)
+        continue;
+      if (!(route.method == currentMethod || route.method == HTTP_ANY))
+        continue;
+      currentUpload.status = UPLOAD_FILE_ABORTED;
+      currentUpload.currentSize = 0;
+      currentUpload.totalSize = requestContentLength;
+      currentUpload.buf = nullptr;
+      route.uploadHandler();
+      break;
+    }
+  }
+
   void resetRequest() {
     currentClient = -1;
     currentMethod = HTTP_GET;
@@ -530,7 +547,9 @@ void WebServer::begin() {
         if (got <= 0)
           break;
         const size_t offset = body.size();
-        body.append(buffer, static_cast<size_t>(got));
+        const size_t wanted = bodyLength - body.size();
+        const size_t count = std::min(static_cast<size_t>(got), wanted);
+        body.append(buffer, count);
         if (hasRawHandlers) {
           for (size_t rawOffset = offset; rawOffset < body.size();
                rawOffset += UPLOAD_CHUNK_SIZE) {
@@ -547,6 +566,11 @@ void WebServer::begin() {
                 body.size(), bodyLength);
         if (hasRawHandlers)
           impl_->emitRawEvent(*this, rawHandlers, RAW_ABORTED, nullptr, 0);
+        auto contentTypeIt = headers.find("content-type");
+        const std::string contentType =
+            contentTypeIt == headers.end() ? "" : contentTypeIt->second;
+        if (contentType.find("multipart/form-data") != std::string::npos)
+          impl_->emitMultipartAbort();
         sendSimpleResponse(client, 400, "Incomplete request body");
         ::close(client);
         continue;

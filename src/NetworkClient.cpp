@@ -1,7 +1,12 @@
 #include "NetworkClient.h"
 
+#include <netdb.h>
 #include <sys/socket.h>
 #include <unistd.h>
+
+#include <cerrno>
+#include <cstdio>
+#include <cstring>
 
 #include "Stream.h"
 
@@ -16,6 +21,41 @@ struct NetworkClient::Impl {
 };
 
 NetworkClient::NetworkClient(int fd) : impl_(std::make_shared<Impl>(fd)) {}
+
+int NetworkClient::connect(const char *host, uint16_t port) {
+  if (!host || host[0] == '\0')
+    return 0;
+
+  char service[8] = {};
+  snprintf(service, sizeof(service), "%u", static_cast<unsigned>(port));
+
+  addrinfo hints{};
+  hints.ai_family = AF_UNSPEC;
+  hints.ai_socktype = SOCK_STREAM;
+
+  addrinfo *results = nullptr;
+  if (getaddrinfo(host, service, &hints, &results) != 0)
+    return 0;
+
+  int fd = -1;
+  for (addrinfo *addr = results; addr != nullptr; addr = addr->ai_next) {
+    fd = ::socket(addr->ai_family, addr->ai_socktype, addr->ai_protocol);
+    if (fd < 0)
+      continue;
+    if (::connect(fd, addr->ai_addr, addr->ai_addrlen) == 0)
+      break;
+    ::close(fd);
+    fd = -1;
+  }
+  freeaddrinfo(results);
+
+  if (fd < 0)
+    return 0;
+
+  stop();
+  impl_ = std::make_shared<Impl>(fd);
+  return 1;
+}
 
 size_t NetworkClient::write(const uint8_t *buf, size_t size) {
   if (!buf || size == 0)
