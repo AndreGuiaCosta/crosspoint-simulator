@@ -35,6 +35,8 @@ Add the simulator to your firmware's platformio.ini as a `lib_dep` and configure
 
 No scripts need to be copied into the firmware repo for the simulator to build. The simulator library automatically patches consumer-side compatibility issues from its own build script when PlatformIO fetches it as a dependency.
 
+Keep the sample `build_src_filter` exclusions unless your firmware has already moved those files behind simulator guards. In the current CrossPoint/CrossInk layout, the simulator library supplies the host-side file-transfer and update shims while the lower-level `WebServer`, `WebSocketsServer`, and `NetworkClient` shims let shared network routes run on the desktop build.
+
 If you only want a self-contained simulator dependency, stop there.
 
 If you also want the `Run Simulator` task to appear in the consuming repo's PlatformIO IDE task list (under the "Custom" folder), let the consuming project own the IDE task registration. Add `custom_run_simulator_target_owner = project` to `[env:simulator]`, then add one project-level hook:
