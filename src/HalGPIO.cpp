@@ -55,7 +55,7 @@ static int scancodeToButton(SDL_Scancode sc) {
 }
 
 void HalGPIO::begin() {
-#ifdef FORCE_DEVICE_X3
+#if defined(SIMULATOR_DEVICE_X3)
   _deviceType = DeviceType::X3;
 #else
   _deviceType = DeviceType::X4;
@@ -142,6 +142,13 @@ unsigned long HalGPIO::getHeldTime() const {
     }
   }
   return maxHeld;
+}
+
+unsigned long HalGPIO::getPowerButtonHeldTime() const {
+  const uint8_t *state = SDL_GetKeyboardState(NULL);
+  if (!state[buttonScancode[BTN_POWER]] || buttonPressTime[BTN_POWER] == 0)
+    return 0;
+  return SDL_GetTicks() - buttonPressTime[BTN_POWER];
 }
 
 bool HalGPIO::consumeSimulatorSleepRequest() {

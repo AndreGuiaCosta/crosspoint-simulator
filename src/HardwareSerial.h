@@ -17,6 +17,7 @@ void onLogChar(char c);
 class HWCDC : public Stream {
 public:
   void begin(unsigned long baud) {}
+  void setTxTimeoutMs(uint32_t timeoutMs) {}
   size_t write(uint8_t c) override {
     std::cerr << (char)c;
     ScriptDriver::onLogChar((char)c);

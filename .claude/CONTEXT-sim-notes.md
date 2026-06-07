@@ -8,7 +8,7 @@ The repo ships as a PlatformIO library; downstream firmware adds it as a `lib_de
 
 ## Current State
 
-The simulator builds and runs on macOS and Linux/WSL. Portrait orientation is correct, gray shading renders cleanly at HiDPI, file browsing lists EPUBs from `./fs_/books/`, and reading a book shows the "Indexing..." popup on first open before rendering pages. Window close exits cleanly. Icons render in the UI (drawImage / drawImageTransparent are now implemented, not stubs). JPEG and PNG decoder shims render rough host-side previews for EPUB images and PNG sleep overlays. HalGPIO carries a DeviceType (X4 default, X3 selectable) so downstream code branching on device type compiles in the simulator. Host-backed web shims cover `WebServer`, `WebSocketsServer`, and `NetworkClient`, with firmware port 80 exposed on `http://127.0.0.1:8080/` and port 81 WebSockets exposed on `ws://127.0.0.1:8081/`.
+The simulator builds and runs on macOS and Linux/WSL. Portrait orientation is correct, gray shading renders cleanly at HiDPI, file browsing lists EPUBs from `./fs_/books/`, and reading a book shows the "Indexing..." popup on first open before rendering pages. Window close exits cleanly. Icons render in the UI (drawImage / drawImageTransparent are now implemented, not stubs). JPEG and PNG decoder shims render rough host-side previews for EPUB images and PNG sleep overlays by default; native `PNGdec`/`JPEGDEC` can be enabled explicitly with `CROSSPOINT_SIM_USE_NATIVE_DECODERS`, `lib_compat_mode = off`, and simulator `lib_ignore = hal, WebSockets`. HalGPIO carries a DeviceType (X4 default, X3 selectable) so downstream code branching on device type compiles in the simulator. Host-backed web shims cover `WebServer`, `WebSocketsServer`, and `NetworkClient`, with firmware port 80 exposed on `http://127.0.0.1:8080/` and port 81 WebSockets exposed on `ws://127.0.0.1:8081/`.
 
 ## Setup
 
@@ -26,7 +26,8 @@ Linux/WSL needs OpenSSL because [MD5Builder_linux.h](src/MD5Builder_linux.h) wra
 1. Copy [sample-platformio-macos.ini](sample-platformio-macos.ini) or [sample-platformio-linux-wsl.ini](sample-platformio-linux-wsl.ini) contents into the firmware's `platformio.ini` as a new `[env:simulator]` block.
 2. For local dev, replace the git ref with a symlink: `simulator=symlink://../crosspoint-simulator`.
 3. Optional: if you want PlatformIO's IDE task list to show `Run Simulator`, add `custom_run_simulator_target_owner = project` and the `post:` hook shown in [README.md](README.md). Do not copy [run_simulator.py](run_simulator.py) into the firmware repo; it is auto-loaded from this library through [library.json](library.json).
-4. Place EPUBs at `./fs_/books/` (relative to the binary's working directory). This maps to SD card path `/books/`.
+4. Optional native decoder mode: add `-DCROSSPOINT_SIM_USE_NATIVE_DECODERS`, set `lib_compat_mode = off`, use `lib_ignore = hal, WebSockets`, and add the native `PNGdec`/`JPEGDEC` dependencies shown in the sample comments.
+5. Place EPUBs at `./fs_/books/` (relative to the binary's working directory). This maps to SD card path `/books/`.
 
 **Build and run**
 
@@ -54,7 +55,7 @@ pio run -e simulator -t run_simulator
 
 **Display thread model.** SDL on macOS requires all SDL calls happen on the main thread, but firmware drives rendering from a FreeRTOS render task (now a `std::thread`). The split: [HalDisplay::refreshDisplay](src/HalDisplay.cpp) (background thread) converts the 1bpp framebuffer to ARGB pixels and sets an atomic `pendingPresent` flag. [HalDisplay::presentIfNeeded](src/HalDisplay.cpp) (called from `simulator_main` on the main thread) uploads to the texture, applies orientation rotation, and calls `SDL_RenderPresent`.
 
-**Orientation.** The renderer's `rotateCoordinates` writes content into the physical 800×480 buffer rotated 90° CCW for `Portrait` (and 90° CW for `PortraitInverted`). The simulator undoes this with `SDL_RenderCopyEx` rotation:
+**Orientation.** The renderer's `rotateCoordinates` writes content into the physical landscape buffer rotated 90° CCW for `Portrait` (and 90° CW for `PortraitInverted`). The simulator undoes this with `SDL_RenderCopyEx` rotation:
 
 | Orientation        | SDL angle |
 | ------------------ | --------- |
@@ -86,7 +87,7 @@ pio run -e simulator -t run_simulator
 
 ### X3 device support scaffolding (commit 674c571, 2026-04-23)
 
-- [HalGPIO](src/HalGPIO.h) now has `enum class DeviceType : uint8_t { X4, X3 }` plus `deviceIsX3()` / `deviceIsX4()` helpers. `_deviceType` defaults to `X4`. This matches a downstream firmware change that branches on device type — without it, simulator builds break.
+- [HalGPIO](src/HalGPIO.h) now has `enum class DeviceType : uint8_t { X4, X3 }` plus `deviceIsX3()` / `deviceIsX4()` helpers. `_deviceType` defaults to `X4`, and `SIMULATOR_DEVICE_X3` selects the X3 device path and 792x528 framebuffer. This matches a downstream firmware change that branches on device type — without it, simulator builds break.
 
 ### Match upstream HAL surface (2026-04-06 onward)
 
@@ -100,7 +101,7 @@ pio run -e simulator -t run_simulator
 
 ### Host-side image decoder previews (2026-05-08)
 
-- [src/JPEGDEC.h](src/JPEGDEC.h) and [src/PNGdec.h](src/PNGdec.h) now decode via vendored [src/stb_image.h](src/stb_image.h), then feed grayscale/RGBA rows through the same callback shape used by the embedded libraries. This is only a desktop preview path; it does not model e-ink waveforms, device memory pressure, or exact image quality.
+- [src/JPEGDEC.h](src/JPEGDEC.h) and [src/PNGdec.h](src/PNGdec.h) decode via vendored [src/stb_image.h](src/stb_image.h) by default, then feed grayscale/RGBA rows through the same callback shape used by the embedded libraries. With `CROSSPOINT_SIM_USE_NATIVE_DECODERS`, those headers pass through to the native PlatformIO `JPEGDEC`/`PNGdec` dependencies instead. Both paths are desktop preview paths; neither models e-ink waveforms, device memory pressure, or exact image quality.
 
 ### Host-backed web server shims (2026-05-10)
 
@@ -143,7 +144,7 @@ After any of the storage / cache fixes: `rm -rf ./fs_/.crosspoint/` to drop stal
 
 ## Known Remaining Work
 
-- SDL window size is fixed at half-scale; no runtime resize on orientation change.
+- SDL window size now follows orientation changes at present time; keep resize and `SDL_RenderSetLogicalSize` on the main-thread `presentIfNeeded()` path. The library build hook patches the common `GfxRenderer::setOrientation()` implementation so consuming repos notify `HalDisplay` without a manual source edit.
 - Thread safety relies on `std::recursive_mutex` in `RenderLock`; no broader audit.
 - `HalPowerManager::startDeepSleep` should not trigger on `WakeupReason::Other` — verify if it ever does.
 - Each new HAL method added in upstream firmware will fail to link until a matching stub is added here. Most are one-line no-ops.

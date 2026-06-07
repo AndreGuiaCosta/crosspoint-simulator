@@ -1,5 +1,21 @@
 #pragma once
-// libjpeg-turbo backend; emits MCUs in 16x16 blocks for the JPEGDEC contract.
+
+#if defined(CROSSPOINT_SIM_USE_NATIVE_DECODERS)
+#if defined(__has_include_next)
+#if __has_include_next(<JPEGDEC.h>)
+#include_next <JPEGDEC.h>
+#else
+#error "CROSSPOINT_SIM_USE_NATIVE_DECODERS requires JPEGDEC in this PlatformIO environment"
+#endif
+#else
+#include_next <JPEGDEC.h>
+#endif
+
+#else
+// Simulator implementation for the JPEGDEC API shape used by firmware.
+// Backed by libjpeg-turbo (see JPEGDEC.cpp); emits MCUs in 16x16 blocks for the
+// JPEGDEC draw-callback contract. Preview aid, not a hardware-accurate e-ink
+// decode path.
 
 #include <cstddef>
 #include <cstdint>
@@ -64,3 +80,4 @@ class JPEGDEC {
   void* userPtr_ = nullptr;
   JPEG_DRAW_CALLBACK drawCb_ = nullptr;
 };
+#endif

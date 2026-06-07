@@ -19,6 +19,7 @@ public:
 
   // Initialize the display hardware and driver
   void begin();
+  void begin(bool seamless);
 
   // Display dimensions
   static constexpr uint16_t DISPLAY_WIDTH = EInkDisplay::DISPLAY_WIDTH;
@@ -61,9 +62,11 @@ public:
                          const unsigned char *lut = nullptr,
                          bool factoryMode = false);
 
-  // Simulator only: keep SDL window rotation in sync with GfxRenderer
-  // orientation.
-  void setSimulatorOrientation(int orientation);
+  // Tiled grayscale strip — no-op in simulator; supportsStripGrayscale()
+  // returns false so callers fall back to the framebuffer path.
+  void writeGrayscalePlaneStrip(bool lsbPlane, const uint8_t* rows, uint16_t yStart, uint16_t numRows);
+  bool supportsStripGrayscale() const;
+
   // Simulator only: call from main thread to push rendered pixels to SDL.
   void presentIfNeeded();
   // Simulator only: returns true once a hard shutdown has been requested.
