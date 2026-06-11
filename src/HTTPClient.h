@@ -80,6 +80,9 @@ public:
   int PUT(const char *body) { return perform("PUT", body ? body : ""); }
   int PUT(const String &body) { return perform("PUT", body.c_str()); }
 
+  // HTTP/1.0 toggle is a no-op here: sim_http_fetch already returns a fully
+  // decoded body, so getStream() never sees chunked framing.
+  void useHTTP10(bool use = true) { (void)use; }
   String getString() { return responseBody_; }
   int getSize() { return static_cast<int>(responseBody_.length()); }
   Stream *getStreamPtr() {
@@ -87,6 +90,7 @@ public:
       responseStream_ = std::make_unique<ResponseBodyStream>(responseBody_);
     return responseStream_.get();
   }
+  Stream &getStream() { return *getStreamPtr(); }
   bool connected() {
     return responseStream_ ? responseStream_->available() > 0 : statusCode_ > 0;
   }
