@@ -1,3 +1,8 @@
+# FORK: vanilla crosspoint-reader (readest-sync branch). CrumBLE uses
+# sim_readest_library_crumble.script instead (different home menu).
+# CAVEATS: written pre-review-refactor — expects the old "fetching" log line
+# and assumes WiFi is already connected; the readest-sync branch has no
+# simulator env yet, so this is currently documentation of the vanilla path.
 # Walk Home → Readest Library entry. Validates Slice 2+3 of Phase 2:
 # the visibility gate (READEST_STORE.hasCredentials) put the entry in the
 # menu, the dispatch route lands in ReadestLibraryActivity, and the activity

@@ -1,0 +1,38 @@
+# Home → Readest Library with the WiFi-selection step and post-review log
+# lines (the vanilla-fork script predates ReadestHttp and
+# assumed WiFi was already connected).
+# Fixture: Lyra theme (uiTheme=1), 1 recent book, signed-in readest.json.
+log libv2: start
+expect_timeout 30000
+expect Entering activity: Home
+wait 500
+
+# Lyra selectable order: recent[0], Browse Files, Recent Books, Readest
+# Library, ... — 3 Downs from recent[0].
+tap down
+tap down
+tap down
+wait 200
+tap confirm
+expect Entering activity: ReadestLibrary
+
+# Sim boots disconnected → the activity pushes the WiFi picker. First row is
+# "Simulator WiFi (fake)" (OPEN), so one confirm connects.
+expect Entering activity: WifiSelection
+wait 1200
+screenshot /screenshots/libv2-01-wifi-picker.bmp
+tap confirm
+
+# Connect → loading screen paints (showLoadingBeforeFetch) → streamed pull
+# against hosted Readest → catalog merge. "library ready" is fetchBooks()'s
+# success log.
+expect_timeout 90000
+expect library ready
+wait 1500
+screenshot /screenshots/libv2-02-library-list.bmp
+
+tap down
+wait 300
+screenshot /screenshots/libv2-03-row2.bmp
+log libv2: complete
+quit

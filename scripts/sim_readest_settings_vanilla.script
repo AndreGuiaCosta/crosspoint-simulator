@@ -1,3 +1,6 @@
+# FORK: vanilla crosspoint-reader (readest-sync branch) — category-bar
+# Settings. CrumBLE uses sim_readest_settings_crumble.script (nested
+# submenu tree). Tap counts assume a fixture WITHOUT Readest credentials.
 # Walk Home → Settings → System tab → Readest Sync entry. Validates that the
 # script driver can drive multi-step menu navigation and that the new
 # Readest settings entry is reachable.

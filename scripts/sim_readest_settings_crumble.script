@@ -1,0 +1,43 @@
+# Home → Settings → Sync & Network → Readest Sync, adapted for the CrumBLE
+# settings tree (root submenus: Display, Reader, Controls, Library,
+# Sync & Network, System) and a signed-in fixture (Readest Library +
+# Reading Stats home entries → Settings is 6 Downs from recent[0]).
+# Validates the settings screen renders the recordSyncResult "last error"
+# left by a previously failed pull.
+log setv2: start
+expect_timeout 30000
+expect Entering activity: Home
+wait 500
+
+tap down
+tap down
+tap down
+tap down
+tap down
+tap down
+wait 200
+tap confirm
+expect Entering activity: Settings
+wait 600
+
+# Root list: Display(0) → 4 Downs → Sync & Network.
+tap down
+tap down
+tap down
+tap down
+wait 200
+screenshot /screenshots/setv2-00-sync-network-highlighted.bmp
+tap confirm
+wait 400
+
+# Sync & Network: WiFi Networks(0), KOReader Sync(1), Readest Sync(2).
+tap down
+tap down
+wait 200
+screenshot /screenshots/setv2-01-readest-highlighted.bmp
+tap confirm
+expect Entering activity: ReadestSettings
+wait 500
+screenshot /screenshots/setv2-02-readest-settings.bmp
+log setv2: complete
+quit
