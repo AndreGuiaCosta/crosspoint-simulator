@@ -1,9 +1,9 @@
 #include <ReadestTlsConfig.h>
 #include <WiFiClientSecure.h>
 
-// Simulator-side override for the firmware's CA-bundle path (`src/test_hooks/
+// Simulator-side override for the firmware's CA-bundle path (`src/network/
 // ReadestTlsConfig.cpp`). The firmware's version is excluded from the
-// simulator build via `build_src_filter` in `platformio.local.ini` and this
+// simulator build via `build_src_filter` in `platformio.ini (simulator_base)` and this
 // implementation is linked in instead. setInsecure() is acceptable here
 // because the simulator's WiFiClientSecure stub doesn't actually verify
 // certificates and the embedded CA bundle symbol doesn't exist on host.
