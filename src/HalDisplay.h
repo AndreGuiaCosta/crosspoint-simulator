@@ -41,6 +41,13 @@ public:
   void refreshDisplay(RefreshMode mode = RefreshMode::FAST_REFRESH,
                       bool turnOffScreen = false);
 
+  // CrumBLE's GfxRenderer calls this under #ifdef SIMULATOR to mirror the
+  // device panel rotation. GfxRenderer already applies the logical coordinate
+  // transform; the host sim renders portrait for our test flows, so just
+  // record the value (no framebuffer rotation needed for portrait screens).
+  void setSimulatorOrientation(int orientation) { simulatorOrientation_ = orientation; }
+  int getSimulatorOrientation() const { return simulatorOrientation_; }
+
   // Power management
   void deepSleep();
 
@@ -52,6 +59,23 @@ public:
   uint16_t getDisplayHeight() const;
   uint16_t getDisplayWidthBytes() const;
   uint32_t getBufferSize() const;
+
+  // X3 grayscale preconditioning settle pass — no-op in the simulator, which
+  // emulates the X4 panel (firmware's X4 path is also a no-op).
+  void preconditionGrayscale() {}
+  void preconditionGrayscale(uint16_t x, uint16_t y, uint16_t w, uint16_t h) {
+    (void)x;
+    (void)y;
+    (void)w;
+    (void)h;
+  }
+
+  // Base frame for a following grayscale overlay. The simulator has no
+  // differential base waveform, so it displays normally with the fallback
+  // mode (matches firmware's non-X3 behavior).
+  void displayGrayscaleBase(RefreshMode fallback = HALF_REFRESH, bool turnOffScreen = false) {
+    displayBuffer(fallback, turnOffScreen);
+  }
 
   void copyGrayscaleBuffers(const uint8_t *lsbBuffer, const uint8_t *msbBuffer);
   void copyGrayscaleLsbBuffers(const uint8_t *lsbBuffer);
@@ -74,6 +98,7 @@ public:
 
 private:
   EInkDisplay einkDisplay;
+  int simulatorOrientation_ = 0;
 };
 
 extern HalDisplay display;
