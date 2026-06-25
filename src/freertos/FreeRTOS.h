@@ -14,6 +14,9 @@
   } while (0)
 #define eIncrement 1
 #define portTICK_PERIOD_MS 1
+#ifndef pdMS_TO_TICKS
+#define pdMS_TO_TICKS(ms) ((ms) / portTICK_PERIOD_MS)
+#endif
 
 // TaskHandle wraps a real thread + a notification counter protected by a
 // condvar.

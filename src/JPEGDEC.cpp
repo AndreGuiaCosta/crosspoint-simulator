@@ -1,3 +1,9 @@
+// When CROSSPOINT_SIM_USE_NATIVE_DECODERS is set, JPEGDEC.h forwards to the
+// real bitbank2 JPEGDEC (via #include_next) and that library supplies the
+// implementation, so this libjpeg-turbo fallback must compile to nothing —
+// otherwise it would (re)define methods on a class it no longer declares.
+#ifndef CROSSPOINT_SIM_USE_NATIVE_DECODERS
+
 #include "JPEGDEC.h"
 
 #include <algorithm>
@@ -189,3 +195,5 @@ int JPEGDEC::decode(int /*x*/, int /*y*/, int /*options*/) {
 
   return 1;
 }
+
+#endif  // CROSSPOINT_SIM_USE_NATIVE_DECODERS
