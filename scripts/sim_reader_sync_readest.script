@@ -5,6 +5,12 @@
 # Assumes valid Readest credentials are already persisted (e.g. via prior
 # `sim_readest_signin.script` run or boot-probe). With no creds the menu
 # entry would be hidden and this test would deadlock.
+#
+# Also assumes a WiFi credential is persisted in /.crosspoint/wifi.json
+# (non-empty `credentials`). Without one the sync activity drops to the
+# WiFi picker instead of proceeding to NTP/hash/pull, and the book_hash=
+# expect below times out. A valid (non-expired) Readest refresh token is
+# required for the pull to return HTTP 200.
 log reader-sync: start
 expect_timeout 90000
 expect Entering activity: Home
@@ -23,16 +29,18 @@ expect Entering activity: EpubReaderMenu
 wait 500
 
 # Navigate to Sync Progress (Readest). Menu items at index 0..N for the
-# image-tests fixture (no footnotes, no kosync creds):
+# image-tests fixture (no footnotes, no bookmarks, no kosync creds):
 #   0 Select Chapter
-#   1 Reading Orientation
-#   2 Auto Turn
-#   3 Go to %
-#   4 Take screenshot
-#   5 Show page as QR
-#   6 Go Home
-#   7 Sync Progress (Readest)
-#   8 Delete Book Cache
+#   1 Toggle Bookmark
+#   2 Reading Orientation
+#   3 Auto Turn
+#   4 Go to %
+#   5 Take screenshot
+#   6 Show page as QR
+#   7 Go Home
+#   8 Sync Progress (Readest)
+#   9 Delete Book Cache
+tap down
 tap down
 tap down
 tap down
