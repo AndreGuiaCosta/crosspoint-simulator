@@ -58,13 +58,16 @@ tap confirm
 expect Entering activity: ReadestSync
 wait 400
 
-# Confirm the activity reaches the pull without erroring. Expect lands at
-# NO_REMOTE_PROGRESS unless this account has prior progress for this hash.
-# `expect` is a substring match, not regex.
+# Confirm the activity fires the config pull and the server answers 200.
+# The firmware logs the request as
+#   [RSYNC] GET <syncApiBase>/sync?...&type=configs&book=<hash>&meta_hash=<hash> -> HTTP 200
+# so match the request line, then the result. `expect` is a substring match,
+# not regex. With an empty/new account the screen lands at NO_REMOTE_PROGRESS;
+# with prior progress it lands at SHOWING_RESULT. Both log "-> HTTP 200".
 expect_timeout 30000
-expect book_hash=
+expect type=configs&book=
 expect_timeout 30000
-expect pull HTTP 200
+expect -> HTTP 200
 wait 1000
 screenshot /screenshots/rsync-03-result.bmp
 
