@@ -37,6 +37,15 @@ inline int xTaskCreate(void (*fn)(void *), const char *name,
   return 1; // pdPASS
 }
 
+// Core pinning has no meaning on the host; delegate to xTaskCreate and
+// ignore the core ID.
+inline int xTaskCreatePinnedToCore(void (*fn)(void *), const char *name,
+                                   uint32_t stackDepth, void *param,
+                                   int priority, TaskHandle_t *handle,
+                                   int /*coreId*/) {
+  return xTaskCreate(fn, name, stackDepth, param, priority, handle);
+}
+
 // Block until notified (simulates ulTaskNotifyTake with clear-on-exit).
 inline uint32_t ulTaskNotifyTake(int /*clearOnExit*/,
                                  uint32_t /*ticksToWait*/) {

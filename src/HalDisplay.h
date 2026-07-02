@@ -60,22 +60,10 @@ public:
   uint16_t getDisplayWidthBytes() const;
   uint32_t getBufferSize() const;
 
-  // X3 grayscale preconditioning settle pass — no-op in the simulator, which
-  // emulates the X4 panel (firmware's X4 path is also a no-op).
-  void preconditionGrayscale() {}
-  void preconditionGrayscale(uint16_t x, uint16_t y, uint16_t w, uint16_t h) {
-    (void)x;
-    (void)y;
-    (void)w;
-    (void)h;
-  }
-
-  // Base frame for a following grayscale overlay. The simulator has no
-  // differential base waveform, so it displays normally with the fallback
-  // mode (matches firmware's non-X3 behavior).
-  void displayGrayscaleBase(RefreshMode fallback = HALF_REFRESH, bool turnOffScreen = false) {
-    displayBuffer(fallback, turnOffScreen);
-  }
+  void displayGrayscaleBase(RefreshMode fallback = HALF_REFRESH,
+                            bool turnOffScreen = false);
+  void preconditionGrayscale();
+  void preconditionGrayscale(uint16_t x, uint16_t y, uint16_t w, uint16_t h);
 
   void copyGrayscaleBuffers(const uint8_t *lsbBuffer, const uint8_t *msbBuffer);
   void copyGrayscaleLsbBuffers(const uint8_t *lsbBuffer);
@@ -86,9 +74,12 @@ public:
                          const unsigned char *lut = nullptr,
                          bool factoryMode = false);
 
-  // Tiled grayscale strip — no-op in simulator; supportsStripGrayscale()
-  // returns false so callers fall back to the framebuffer path.
-  void writeGrayscalePlaneStrip(bool lsbPlane, const uint8_t* rows, uint16_t yStart, uint16_t numRows);
+  // The simulator intentionally advertises strip grayscale support so host
+  // builds exercise the same low-memory path as the device firmware, and so
+  // streamed plane data can feed the same grayscale preview compositor as the
+  // legacy full-frame API.
+  void writeGrayscalePlaneStrip(bool lsbPlane, const uint8_t* rows,
+                                uint16_t yStart, uint16_t numRows);
   bool supportsStripGrayscale() const;
 
   // Simulator only: call from main thread to push rendered pixels to SDL.
