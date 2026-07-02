@@ -24,8 +24,19 @@ typedef SimPortMux portMUX_TYPE;
 #define portMUX_INITIALIZER_UNLOCKED                                          \
   {}
 
-inline void taskENTER_CRITICAL(portMUX_TYPE *mux) { mux->mtx.lock(); }
-inline void taskEXIT_CRITICAL(portMUX_TYPE *mux) { mux->mtx.unlock(); }
+// On the ESP32 a critical section ultimately disables interrupts, so passing
+// nullptr (as crosspoint-reader's ActivityManager does) is legal on device.
+// Model that with a process-global fallback mutex instead of dereferencing.
+inline std::recursive_mutex &simGlobalCriticalMux() {
+  static std::recursive_mutex m;
+  return m;
+}
+inline void taskENTER_CRITICAL(portMUX_TYPE *mux) {
+  (mux ? mux->mtx : simGlobalCriticalMux()).lock();
+}
+inline void taskEXIT_CRITICAL(portMUX_TYPE *mux) {
+  (mux ? mux->mtx : simGlobalCriticalMux()).unlock();
+}
 #define portENTER_CRITICAL(mux) taskENTER_CRITICAL(mux)
 #define portEXIT_CRITICAL(mux) taskEXIT_CRITICAL(mux)
 
