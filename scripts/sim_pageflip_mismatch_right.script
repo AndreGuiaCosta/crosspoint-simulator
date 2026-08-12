@@ -1,0 +1,22 @@
+# PageFlip mismatch test, RIGHT half (slot 1). This instance is started with a different screen
+# margin, so its viewport -- and therefore its layout hash -- cannot match the left half's
+# (docs/pageflip.md section 5). It must notice, say so, and refuse to pair.
+#
+# Receives no input at all after opening the book. The left instance presses throughout, and the
+# point of the test is that none of those presses move this device: an incompatible peer that still
+# gated the two-step advance would leave the pair silently desynced.
+log pageflip-mismatch-right: start
+expect_timeout 60000
+expect Entering activity: Home
+wait 800
+tap confirm
+expect Entering activity: EpubReader
+wait 9000
+# Detection happens on the greeting, before any turn has been applied.
+expect incompatible layout
+screenshot /screenshots/pf-mm-right-00.bmp
+# Long enough for both of the left half's presses to arrive and be rejected.
+wait 14000
+screenshot /screenshots/pf-mm-right-01.bmp
+log pageflip-mismatch-right: done
+quit

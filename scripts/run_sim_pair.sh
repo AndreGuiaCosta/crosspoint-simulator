@@ -33,6 +33,12 @@ for side in left right; do
     cp fs_/.crosspoint/recent.json "fs_pf_$side/.crosspoint/recent.json"
 done
 
+# Screenshots land in fs_/screenshots (see the note above), which nothing else clears. Without this
+# a run that died before taking any would be compared against the previous run's files and pass --
+# which is exactly what happened once, hiding a segfault behind three "halves match" lines.
+rm -f fs_/screenshots/pf-left-*.bmp fs_/screenshots/pf-right-*.bmp \
+      fs_/screenshots/pf-left-*.png fs_/screenshots/pf-right-*.png
+
 set +e
 CROSSPOINT_SIM_SD=./fs_pf_left CROSSPOINT_PAGEFLIP_SLOT=0 \
   timeout "$TIMEOUT" "$BIN" --script "$SCRIPT_DIR/sim_pageflip_left.script" 2>sim-pf-left.log >/dev/null &
