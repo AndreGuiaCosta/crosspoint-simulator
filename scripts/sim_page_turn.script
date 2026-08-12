@@ -1,0 +1,26 @@
+# Regression check for the pageTurn()/advanceOnePage() split: open the first recent
+# book, step forward three pages and back one, screenshotting each landing page.
+# Page content must change on every step and page 2 must match the back-step landing.
+log page-turn: start
+expect_timeout 60000
+expect Entering activity: Home
+wait 800
+tap confirm
+expect Entering activity: EpubReader
+# First open may build the section cache.
+wait 8000
+screenshot /screenshots/turn-00.bmp
+tap down
+wait 2500
+screenshot /screenshots/turn-01.bmp
+tap down
+wait 2500
+screenshot /screenshots/turn-02.bmp
+tap down
+wait 2500
+screenshot /screenshots/turn-03.bmp
+tap up
+wait 2500
+screenshot /screenshots/turn-04-back.bmp
+log page-turn: done
+quit
