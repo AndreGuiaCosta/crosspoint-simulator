@@ -1,0 +1,19 @@
+# PageFlip pair test, RIGHT half (slot 1). Receives no input at all after opening the book: every
+# page it turns is driven by the left instance's presses over the loopback link.
+log pageflip-right: start
+expect_timeout 60000
+expect Entering activity: Home
+wait 800
+tap confirm
+expect Entering activity: EpubReader
+wait 9000
+screenshot /screenshots/pf-right-00.bmp
+# The left instance presses from here on. Both of these must arrive with no local input.
+expect PageFlip peer turn
+wait 2500
+screenshot /screenshots/pf-right-01.bmp
+expect PageFlip peer turn
+wait 2500
+screenshot /screenshots/pf-right-02.bmp
+log pageflip-right: done
+quit

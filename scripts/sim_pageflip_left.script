@@ -1,0 +1,22 @@
+# PageFlip pair test, LEFT half (slot 0). Opens the book, waits for the right instance to be
+# ready, then turns the page twice. Nothing here asserts the peer -- that is the right script's job.
+log pageflip-left: start
+expect_timeout 60000
+expect Entering activity: Home
+wait 800
+tap confirm
+expect Entering activity: EpubReader
+# First open builds the section cache.
+wait 9000
+screenshot /screenshots/pf-left-00.bmp
+# Give the right instance time to finish its own cache build before turning.
+wait 6000
+tap down
+wait 3000
+screenshot /screenshots/pf-left-01.bmp
+tap down
+wait 3000
+screenshot /screenshots/pf-left-02.bmp
+wait 3000
+log pageflip-left: done
+quit
