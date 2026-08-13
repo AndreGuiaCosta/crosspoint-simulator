@@ -17,6 +17,7 @@ set -e
 TIMEOUT="${1:-120}"
 BIN="${SIM_BIN:-./.pio/build/simulator/program}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+. "$SCRIPT_DIR/pageflip_settings.sh"
 
 if [ ! -x "$BIN" ]; then
   echo "simulator binary missing at $BIN — run pio run -e simulator first" >&2
@@ -29,6 +30,15 @@ for side in left right solo; do
   cp -r fs_/books "fs_pf_$side/books"
   [ -f fs_/.crosspoint/recent.json ] && cp fs_/.crosspoint/recent.json "fs_pf_$side/.crosspoint/recent.json"
 done
+
+write_pair_settings left
+write_pair_settings right
+# The reference is configured as a pair too, and then left to run alone. Deliberate: once the peer
+# leaves, the left half carries the status-bar badge for a pair that is configured but absent, and
+# these screenshots are compared byte for byte. A reference with paired reading switched off would
+# differ by the badge alone and fail for a reason that has nothing to do with page turns. Being
+# alone it never advances by two, so it is still exactly one page per press.
+write_pair_settings solo
 
 rm -f fs_/screenshots/pf-off-*.bmp fs_/screenshots/pf-off-*.png
 rm -f fs_/screenshots/pf-solo-*.bmp fs_/screenshots/pf-solo-*.png
@@ -91,7 +101,10 @@ check_against_solo() {  # check_against_solo <shot> <reference page>
     FAIL=1
   fi
 }
-check_against_solo 00 00
+# Only the shot AFTER the peer left is compared. The one before it was taken while the pair was
+# healthy, so it carries no badge, while every reference shot does -- and run_sim_pair.sh already
+# covers "a paired left half sits on page 0".
+#
 # Page 1, not page 2. Page 2 would mean the device was still advancing for a peer that had gone.
 check_against_solo 01 01
 

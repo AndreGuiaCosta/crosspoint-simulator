@@ -17,6 +17,7 @@ set -e
 TIMEOUT="${1:-90}"
 BIN="${SIM_BIN:-./.pio/build/simulator/program}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+. "$SCRIPT_DIR/pageflip_settings.sh"
 
 if [ ! -x "$BIN" ]; then
   echo "simulator binary missing at $BIN — run pio run -e simulator first" >&2
@@ -34,6 +35,9 @@ for side in left right solo; do
   [ -f fs_/.crosspoint/recent.json ] && mkdir -p "fs_pf_$side/.crosspoint" &&
     cp fs_/.crosspoint/recent.json "fs_pf_$side/.crosspoint/recent.json"
 done
+
+write_pair_settings left
+write_pair_settings right
 
 # Screenshots land in fs_/screenshots (see the note above), which nothing else clears. Without this
 # a run that died before taking any would be compared against the previous run's files and pass --
@@ -85,8 +89,22 @@ echo "--- exit codes: solo=$SOLO_RC left=$LEFT_RC right=$RIGHT_RC (0=quit, 3=exp
 #
 # Until the join negotiation of section 4.2 landed, the halves DID match, and this check asserted
 # that instead. It was a canary, and it fired.
-echo "--- spread check: left=solo 0,2,4 right=solo 1,3,5 ---"
+# Before anything about pages: did the two instances pair at all, and in the roles asked for?
+# Paired reading is off by default (section 9 step 8), so an instance missing its settings file
+# reads solo -- and a solo reader on page 0 passes the very first check below, which would put the
+# blame on the spread logic rather than on the setup.
+echo "--- the link must come up in the configured roles ---"
 MISMATCH=0
+for side in left right; do
+  if grep -q "PageFlip link up as $side" "sim-pf-$side.log"; then
+    echo "  OK   $side half came up as the $side device"
+  else
+    echo "  FAIL $side half never reported that role — check pageflipEnabled / pageflipRole"
+    MISMATCH=1
+  fi
+done
+
+echo "--- spread check: left=solo 0,2,4 right=solo 1,3,5 ---"
 check_against_solo() {
   local label="$1" shot="$2" solo="$3"
   local sum solo_sum

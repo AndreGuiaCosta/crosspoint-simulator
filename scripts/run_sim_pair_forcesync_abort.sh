@@ -21,6 +21,7 @@ set -e
 TIMEOUT="${1:-120}"
 BIN="${SIM_BIN:-./.pio/build/simulator/program}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+. "$SCRIPT_DIR/pageflip_settings.sh"
 
 if [ ! -x "$BIN" ]; then
   echo "simulator binary missing at $BIN — run pio run -e simulator first" >&2
@@ -36,7 +37,8 @@ done
 
 # 0 is BOOK_PROGRESS; the default is 2 (HIDE_PROGRESS). A visible progress bar makes this half
 # reserve more of the screen, so its viewport differs from the left's however the offer is applied.
-echo '{"statusBarProgressBar":0}' > fs_pf_right/.crosspoint/settings.json
+write_pair_settings left
+write_pair_settings right '"statusBarProgressBar":0'
 cp fs_pf_right/.crosspoint/settings.json "$PWD/fs_pf_right/.crosspoint/settings.before.json"
 
 rm -f fs_/screenshots/pf-fsa-*.bmp fs_/screenshots/pf-fsa-*.png

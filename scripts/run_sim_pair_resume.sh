@@ -18,6 +18,7 @@ set -e
 TIMEOUT="${1:-120}"
 BIN="${SIM_BIN:-./.pio/build/simulator/program}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+. "$SCRIPT_DIR/pageflip_settings.sh"
 
 if [ ! -x "$BIN" ]; then
   echo "simulator binary missing at $BIN — run pio run -e simulator first" >&2
@@ -30,6 +31,9 @@ for side in left right solo; do
   cp -r fs_/books "fs_pf_$side/books"
   [ -f fs_/.crosspoint/recent.json ] && cp fs_/.crosspoint/recent.json "fs_pf_$side/.crosspoint/recent.json"
 done
+
+write_pair_settings left
+write_pair_settings right
 
 rm -f fs_/screenshots/pf-rs-*.bmp fs_/screenshots/pf-rs-*.png
 rm -f fs_/screenshots/pf-solo-*.bmp fs_/screenshots/pf-solo-*.png

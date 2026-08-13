@@ -17,6 +17,7 @@ set -e
 TIMEOUT="${1:-90}"
 BIN="${SIM_BIN:-./.pio/build/simulator/program}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+. "$SCRIPT_DIR/pageflip_settings.sh"
 
 if [ ! -x "$BIN" ]; then
   echo "simulator binary missing at $BIN — run pio run -e simulator first" >&2
@@ -32,7 +33,8 @@ done
 
 # The whole point of the run: the right half lays out at a different margin. 5 is the default
 # (SCREEN_MARGIN_MIN), so 20 is comfortably distinct and still inside SCREEN_MARGIN_MAX.
-echo '{"screenMargin":20}' > fs_pf_right/.crosspoint/settings.json
+write_pair_settings left
+write_pair_settings right '"screenMargin":20'
 
 # Stale shots would let a crashed run pass the "never moved" check below.
 rm -f fs_/screenshots/pf-mm-right-*.bmp fs_/screenshots/pf-mm-right-*.png

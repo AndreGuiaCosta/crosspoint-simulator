@@ -18,6 +18,7 @@ set -e
 TIMEOUT="${1:-120}"
 BIN="${SIM_BIN:-./.pio/build/simulator/program}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+. "$SCRIPT_DIR/pageflip_settings.sh"
 
 if [ ! -x "$BIN" ]; then
   echo "simulator binary missing at $BIN — run pio run -e simulator first" >&2
@@ -33,7 +34,8 @@ done
 
 # The divergence the force-sync has to repair. 5 is the default (SCREEN_MARGIN_MIN), so the left
 # half offering its own settings must bring this back to 5.
-echo '{"screenMargin":20}' > fs_pf_right/.crosspoint/settings.json
+write_pair_settings left
+write_pair_settings right '"screenMargin":20'
 
 # Stale shots would let a crashed run pass the convergence check below.
 rm -f fs_/screenshots/pf-fs-*.bmp fs_/screenshots/pf-fs-*.png
