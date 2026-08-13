@@ -1,0 +1,27 @@
+# PageFlip force-sync test, RIGHT half (slot 1) -- the device being pushed to (section 5.1).
+#
+# Started with a different screen margin, so it reports the mismatch exactly as the negative pair
+# test does. The difference is what happens next: the left half confirms, this half preflights the
+# offer, answers it, and applies the commit -- and nothing is written before that answer.
+#
+# Receives no input of its own. Its own prompt is dismissed by the arriving offer, because the
+# choice of source is made the moment either user confirms.
+log pageflip-fs-right: start
+expect_timeout 60000
+expect Entering activity: Home
+wait 800
+tap confirm
+expect Entering activity: EpubReader
+wait 9000
+expect incompatible layout
+screenshot /screenshots/pf-fs-right-00.bmp
+# The preflight runs on the offer and writes nothing; the verdict is what the source commits on.
+expect PageFlip settings preflight
+expect PageFlip applied the pair's settings
+# The rebuild re-lays out the chapter at the new margin, and the re-greet that follows is what
+# proves the two devices finally agree.
+wait 12000
+screenshot /screenshots/pf-fs-right-01.bmp
+wait 2000
+log pageflip-fs-right: done
+quit

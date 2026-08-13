@@ -1,0 +1,26 @@
+# PageFlip force-sync test, LEFT half (slot 0) -- the source (docs/pageflip.md section 5.1).
+#
+# The two halves start with different screen margins, so they cannot pair. Both are prompted; this
+# one confirms, which is what nominates its settings as the pair's. Everything after the press is
+# the right half's story, so the assertions live there.
+log pageflip-fs-left: start
+expect_timeout 60000
+expect Entering activity: Home
+wait 800
+tap confirm
+expect Entering activity: EpubReader
+# First open builds the section cache.
+wait 9000
+# The layouts have to be seen to disagree before there is anything to repair.
+expect incompatible layout
+# The prompt waits out MISMATCH_CONFIRM_MS so a pair mid-rotation does not get one; only then does
+# Confirm mean "send mine" rather than "open the reader menu".
+wait 6000
+screenshot /screenshots/pf-fs-left-00.bmp
+tap confirm
+# The offer, the peer's preflight, its commit and its rebuild all happen in here.
+wait 20000
+screenshot /screenshots/pf-fs-left-01.bmp
+wait 2000
+log pageflip-fs-left: done
+quit

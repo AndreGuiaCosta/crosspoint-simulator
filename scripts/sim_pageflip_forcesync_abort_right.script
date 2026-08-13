@@ -1,0 +1,22 @@
+# PageFlip force-sync ABORT test, RIGHT half (slot 1) -- the offer that must be refused (§5.1).
+#
+# This half diverges in a status-bar setting, which moves the viewport but is NOT part of the push.
+# So the offer cannot make the two devices agree, and the preflight has to say so BEFORE anything is
+# written -- the failure this guards is a force-sync that reports success, invalidates a layout
+# cache, and leaves the mismatch exactly where it was.
+log pageflip-fs-abort-right: start
+expect_timeout 60000
+expect Entering activity: Home
+wait 800
+tap confirm
+expect Entering activity: EpubReader
+wait 9000
+expect incompatible layout
+screenshot /screenshots/pf-fsa-right-00.bmp
+# Verdict 3 is ScreenDiffers. The run's assertions check that nothing follows it.
+expect PageFlip settings preflight
+wait 12000
+screenshot /screenshots/pf-fsa-right-01.bmp
+wait 2000
+log pageflip-fs-abort-right: done
+quit
