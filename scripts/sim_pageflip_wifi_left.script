@@ -1,0 +1,39 @@
+# WiFi coexistence (docs/pageflip.md section 6), LEFT half: it opens the book with WiFi already up,
+# so the pair must not form at all -- and then WiFi goes away and it must form after all.
+#
+# The suspension is not politeness. The SDK transport's begin() runs its own end() first, and that
+# end() disconnects WiFi and puts the radio mode back to off: a book opened during a download would
+# kill the download. And ESP-NOW peers must share a channel, which an AP association chooses.
+#
+# `wifi on` before the book opens, because the link is brought up by the reader's onEnter. On real
+# hardware you get here by joining a network from Settings and then opening a book: that path leaves
+# WiFi up, unlike the seven network activities that reboot on the way out.
+log pageflip-wifi-left: start
+expect_timeout 90000
+expect Entering activity: Home
+wait 800
+wifi on
+tap confirm
+expect Entering activity: EpubReader
+# First open builds the section cache. The suspended notice comes and goes inside this window.
+wait 10000
+screenshot /screenshots/pf-wifi-left-00.bmp
+# One press, one page: suspended is solo, not half-paired. Measured against the paired-alone
+# reference, because a configured pair with no link carries the status-bar badge.
+tap down
+wait 3000
+screenshot /screenshots/pf-wifi-left-01.bmp
+log pageflip-wifi-left: releasing the radio
+wifi off
+# The link comes up on the next pump, greets, and the join classifies the pair. This half is a page
+# ahead of the other, so section 4.2 calls it Swapped and the two exchange positions: this one lands
+# back on page 0 and the other on page 1. The badge goes with the suspension.
+wait 9000
+screenshot /screenshots/pf-wifi-left-02.bmp
+# And the pair advances by two from there.
+tap down
+wait 4000
+screenshot /screenshots/pf-wifi-left-03.bmp
+wait 1000
+log pageflip-wifi-left: done
+quit

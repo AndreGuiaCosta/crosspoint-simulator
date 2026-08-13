@@ -1,0 +1,23 @@
+# WiFi coexistence (docs/pageflip.md section 6), RIGHT half: an ordinary paired reader, waiting for
+# a peer whose radio is suspended. It presses nothing at all -- every page it shows was decided by
+# the join and by the other half's press, which is what makes it evidence that the pair re-formed.
+log pageflip-wifi-right: start
+expect_timeout 90000
+expect Entering activity: Home
+wait 800
+tap confirm
+expect Entering activity: EpubReader
+# The cache build. Nothing can arrive before this: the other half has no radio yet.
+wait 9000
+# Blocks until the other half releases WiFi, greets, and the join lands. Waiting on it rather than
+# sleeping past it is the point -- this is the resume the section is about.
+expect peer present
+# The Swapped exchange of section 4.2 seeks this half to the other's page, one ahead.
+wait 3000
+screenshot /screenshots/pf-wifi-right-00.bmp
+# The other half presses once around here; this one advances with it, by two.
+wait 8000
+screenshot /screenshots/pf-wifi-right-01.bmp
+wait 1000
+log pageflip-wifi-right: done
+quit

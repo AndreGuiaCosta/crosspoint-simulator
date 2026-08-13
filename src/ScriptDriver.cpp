@@ -20,6 +20,7 @@
 #include <vector>
 
 #include "HalDisplay.h"
+#include "WiFi.h"
 
 extern HalDisplay display;
 extern std::atomic<bool> quitRequested;  // defined in HalDisplay.cpp
@@ -30,7 +31,7 @@ namespace {
 // ---------- script storage ----------
 
 struct Command {
-  enum Op { PRESS, RELEASE, TAP, TYPE, WAIT, SCREENSHOT, EXPECT, EXPECT_TIMEOUT, LOG, QUIT };
+  enum Op { PRESS, RELEASE, TAP, TYPE, WAIT, SCREENSHOT, EXPECT, EXPECT_TIMEOUT, LOG, WIFI, QUIT };
   Op op;
   std::string arg;
   uint32_t numeric = 0;  // wait ms, expect_timeout ms
@@ -132,6 +133,17 @@ bool readScript(const std::string& path) {
     } else if (head == "log") {
       c.op = Command::LOG;
       c.arg = rest;
+    } else if (head == "wifi") {
+      // `wifi on|off`, for the state PageFlip has to stand aside for (docs/pageflip.md section 6).
+      // The firmware only raises WiFi inside network activities, and entering one deletes the
+      // reader -- so the reachable route is a journey (Settings, join a network, back out, open a
+      // book) rather than anything a reader script can express. This sets the mode directly.
+      c.op = Command::WIFI;
+      c.arg = rest;
+      if (c.arg != "on" && c.arg != "off") {
+        std::fprintf(stderr, "[SCRIPT] line %d: wifi takes on or off, got '%s'\n", lineNo, c.arg.c_str());
+        return false;
+      }
     } else if (head == "quit") {
       c.op = Command::QUIT;
     } else {
@@ -352,6 +364,16 @@ void executeCurrent() {
       std::fprintf(stderr, "[SCRIPT] %s\n", c.arg.c_str());
       advance();
       break;
+    case Command::WIFI: {
+      // Straight at the stub's mode, deliberately: raising it the way the firmware does means
+      // entering a network activity, which tears the reader down and the pair with it -- so a
+      // script that went the long way round could never observe a reader meeting a live radio.
+      const bool on = c.arg == "on";
+      WiFi.mode(on ? WIFI_STA : WIFI_OFF);
+      std::fprintf(stderr, "[SCRIPT] wifi %s\n", on ? "on" : "off");
+      advance();
+      break;
+    }
     case Command::QUIT:
       std::fprintf(stderr, "[SCRIPT] quit\n");
       quitRequested.store(true);
