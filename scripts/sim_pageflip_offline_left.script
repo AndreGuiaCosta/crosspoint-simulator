@@ -1,0 +1,30 @@
+# The peer-offline case (docs/pageflip.md section 4), LEFT half: it stays running while the other
+# instance quits under it, which is what a device powering off or walking out of range looks like
+# from here -- no farewell, just silence.
+#
+# The point is not the notice. It is that presence stops licensing the two-step advance: a device
+# still advancing by two with nothing on the other end is a reader that silently skips every other
+# page. So the press below must land ONE page on.
+#
+# Deliberately `wait` rather than `expect peer went quiet`. ScriptDriver matches expects against a
+# 256-line ring, and that notice is followed inside the same frame by hundreds of image-render debug
+# lines -- it is evicted before the next tick can see it. The harness greps the whole log for it
+# instead, which no amount of logging can drown.
+log pageflip-offline-left: start
+expect_timeout 90000
+expect Entering activity: Home
+wait 800
+tap confirm
+expect Entering activity: EpubReader
+wait 9000
+expect peer present
+wait 2000
+screenshot /screenshots/pf-off-left-00.bmp
+# The right half leaves at about eleven seconds in; presence expires four missed heartbeats later.
+wait 22000
+tap down
+wait 5000
+screenshot /screenshots/pf-off-left-01.bmp
+wait 1000
+log pageflip-offline-left: done
+quit

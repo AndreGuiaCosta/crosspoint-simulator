@@ -1,0 +1,13 @@
+# The peer-offline case, RIGHT half: it pairs and then leaves. Quitting is the closest the
+# simulator gets to a battery latch dropping -- the process goes away mid-session with nothing sent.
+log pageflip-offline-right: start
+expect_timeout 60000
+expect Entering activity: Home
+wait 800
+tap confirm
+expect Entering activity: EpubReader
+wait 9000
+expect peer present
+wait 2000
+log pageflip-offline-right: leaving
+quit
