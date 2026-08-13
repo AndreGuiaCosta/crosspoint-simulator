@@ -1,0 +1,20 @@
+# The divergent join (docs/pageflip.md section 4.3), LEFT half: the device the user confirms on.
+# It must NOT move -- confirming picks this device's position for the pair, and the other one comes
+# to it.
+log pageflip-resume-left: start
+expect_timeout 60000
+expect Entering activity: Home
+wait 800
+tap confirm
+expect Entering activity: EpubReader
+wait 9000
+# Both halves reach this: neither position is more right than the other, so the user picks.
+expect positions unrelated
+wait 2500
+screenshot /screenshots/pf-rs-left-00.bmp
+tap confirm
+wait 4000
+screenshot /screenshots/pf-rs-left-01.bmp
+wait 2000
+log pageflip-resume-left: done
+quit

@@ -1,0 +1,19 @@
+# The divergent join (docs/pageflip.md section 4.3), RIGHT half: it resumes part-way through the
+# book, is prompted like the left half, and receives no input at all. The left user confirms, and
+# this device seeks to that position and takes its role offset from it.
+log pageflip-resume-right: start
+expect_timeout 60000
+expect Entering activity: Home
+wait 800
+tap confirm
+expect Entering activity: EpubReader
+wait 9000
+expect positions unrelated
+wait 2500
+screenshot /screenshots/pf-rs-right-00.bmp
+# Driven entirely by the other device's Confirm.
+expect reading from the peer's choice
+wait 5000
+screenshot /screenshots/pf-rs-right-01.bmp
+log pageflip-resume-right: done
+quit

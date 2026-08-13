@@ -1,0 +1,17 @@
+# Leaves a book part-read, so a later pair run has two devices at genuinely unrelated positions --
+# the divergent join of docs/pageflip.md section 4.3. Run solo: with no peer there is no spread and
+# no join, just an ordinary reader saving its progress on the way out.
+log pageflip-seed: start
+expect_timeout 60000
+expect Entering activity: Home
+wait 800
+tap confirm
+expect Entering activity: EpubReader
+# First open builds the section cache.
+wait 9000
+tap down
+wait 2500
+tap down
+wait 3000
+log pageflip-seed: done
+quit
