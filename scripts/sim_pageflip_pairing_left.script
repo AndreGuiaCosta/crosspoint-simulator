@@ -1,0 +1,43 @@
+# Pairing (docs/pageflip.md section 8.1), LEFT half: it walks to the pairing screen, waits for the
+# other instance to appear on it, and selects it.
+#
+# Both instances have to be on this screen at once. That is the design, not a limitation of the
+# harness: beacons only go out from here, so a device can only be discovered by somebody who also
+# asked to pair.
+#
+# The route was established with sim_pageflip_pairing_probe.script rather than guessed. Home's menu
+# is [continue reading, Browse Files, Recent Books, File Transfer, Settings]; inside Settings row 0
+# is the tab bar and Confirm on it cycles Display -> Reader; Up from row 0 wraps to the last entry
+# of the tab, which is where the pairing action is appended.
+log pageflip-pairing-left: start
+expect_timeout 90000
+expect Entering activity: Home
+wait 1000
+tap down
+tap down
+tap down
+tap down
+wait 500
+tap confirm
+expect Entering activity: Settings
+wait 1500
+tap confirm
+wait 800
+tap up
+wait 800
+tap confirm
+expect Entering activity: PageFlipPairing
+# Beacons go out once a second; four seconds is comfortably past the first exchange.
+wait 4000
+screenshot /screenshots/pf-pairing-left-00.bmp
+# Row 0 is "any nearby device"; the discovered one is the row below it.
+tap down
+wait 800
+screenshot /screenshots/pf-pairing-left-01.bmp
+tap confirm
+# The notice holds for 2.5s and then the screen closes itself.
+wait 1200
+screenshot /screenshots/pf-pairing-left-02.bmp
+wait 2500
+log pageflip-pairing-left: done
+quit
