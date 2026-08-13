@@ -24,8 +24,10 @@ if [ ! -x "$BIN" ]; then
 fi
 
 # Fresh SD roots each run: a stale progress.bin would reopen the book mid-way and the two halves
-# would start from different pages, which is a different test (the join negotiation, section 4).
-for side in left right; do
+# would start from different pages, which is the divergent join of section 4.3 -- a different test.
+# The solo root is the reference walk's; it must be built the same way, or a difference in
+# pagination would show up as a spread that is off by a page.
+for side in left right solo; do
   rm -rf "fs_pf_$side"
   mkdir -p "fs_pf_$side/screenshots"
   cp -r fs_/books "fs_pf_$side/books"
@@ -36,10 +38,17 @@ done
 # Screenshots land in fs_/screenshots (see the note above), which nothing else clears. Without this
 # a run that died before taking any would be compared against the previous run's files and pass --
 # which is exactly what happened once, hiding a segfault behind three "halves match" lines.
-rm -f fs_/screenshots/pf-left-*.bmp fs_/screenshots/pf-right-*.bmp \
-      fs_/screenshots/pf-left-*.png fs_/screenshots/pf-right-*.png
+rm -f fs_/screenshots/pf-left-*.bmp fs_/screenshots/pf-right-*.bmp fs_/screenshots/pf-solo-*.bmp \
+      fs_/screenshots/pf-left-*.png fs_/screenshots/pf-right-*.png fs_/screenshots/pf-solo-*.png
 
+# The reference walk first, and alone: one instance with no peer turns exactly one page per press,
+# which is the ground truth the spread is measured against. Run before the pair rather than
+# alongside it, or it would BE the peer.
 set +e
+CROSSPOINT_SIM_SD=./fs_pf_solo CROSSPOINT_PAGEFLIP_SLOT=0 \
+  timeout "$TIMEOUT" "$BIN" --script "$SCRIPT_DIR/sim_pageflip_solo_ref.script" 2>sim-pf-solo.log >/dev/null
+SOLO_RC=$?
+
 CROSSPOINT_SIM_SD=./fs_pf_left CROSSPOINT_PAGEFLIP_SLOT=0 \
   timeout "$TIMEOUT" "$BIN" --script "$SCRIPT_DIR/sim_pageflip_left.script" 2>sim-pf-left.log >/dev/null &
 LEFT_PID=$!
@@ -62,31 +71,43 @@ for bmp in fs_pf_*/screenshots/*.bmp; do
 done
 shopt -u nullglob
 
-for side in left right; do
+for side in solo left right; do
   echo "--- $side trace ---"
   grep -E '^\[SCRIPT\]|PageFlip' "sim-pf-$side.log" || true
 done
 
-echo "--- exit codes: left=$LEFT_RC right=$RIGHT_RC (0=quit, 3=expect timeout, 124=killed) ---"
+echo "--- exit codes: solo=$SOLO_RC left=$LEFT_RC right=$RIGHT_RC (0=quit, 3=expect timeout, 124=killed) ---"
 
-# The halves currently track each other exactly: the one-page offset is established by the join
-# negotiation (docs/pageflip.md section 4.2), which is phase 5 and not implemented, so a matching
-# pair of screenshots is the correct result today. This check is a canary -- when the join lands it
-# MUST start failing, and should then be replaced by "differs by exactly one page".
-echo "--- spread check (expect identical until the join negotiation lands) ---"
+# The pair walks the same pages a solo reader does, split between the two devices: the left half
+# shows 0, 2, 4 and the right half 1, 3, 5. Asserting each of the six against the reference is what
+# makes this "the spread is exactly one page" rather than merely "the halves are not identical" --
+# a pair that had desynced by nine pages would also be not-identical.
+#
+# Until the join negotiation of section 4.2 landed, the halves DID match, and this check asserted
+# that instead. It was a canary, and it fired.
+echo "--- spread check: left=solo 0,2,4 right=solo 1,3,5 ---"
 MISMATCH=0
-for shot in 00 01 02; do
-  LEFT_SUM=$(md5sum "fs_/screenshots/pf-left-$shot.bmp" 2>/dev/null | cut -d' ' -f1)
-  RIGHT_SUM=$(md5sum "fs_/screenshots/pf-right-$shot.bmp" 2>/dev/null | cut -d' ' -f1)
-  if [ -z "$LEFT_SUM" ] || [ -z "$RIGHT_SUM" ]; then
-    echo "  $shot: MISSING (left=${LEFT_SUM:-none} right=${RIGHT_SUM:-none})"
+check_against_solo() {
+  local label="$1" shot="$2" solo="$3"
+  local sum solo_sum
+  sum=$(md5sum "fs_/screenshots/pf-$label-$shot.bmp" 2>/dev/null | cut -d' ' -f1)
+  solo_sum=$(md5sum "fs_/screenshots/pf-solo-$solo.bmp" 2>/dev/null | cut -d' ' -f1)
+  if [ -z "$sum" ] || [ -z "$solo_sum" ]; then
+    echo "  $label-$shot: MISSING (shot=${sum:-none} reference=${solo_sum:-none})"
     MISMATCH=1
-  elif [ "$LEFT_SUM" = "$RIGHT_SUM" ]; then
-    echo "  $shot: halves match"
+  elif [ "$sum" = "$solo_sum" ]; then
+    echo "  $label-$shot: page $solo, as expected"
   else
-    echo "  $shot: halves DIFFER — expected while phase 5 is unimplemented?"
+    echo "  $label-$shot: NOT page $solo — the spread is off"
     MISMATCH=1
   fi
-done
+}
 
-[ "$LEFT_RC" -eq 0 ] && [ "$RIGHT_RC" -eq 0 ] && [ "$MISMATCH" -eq 0 ]
+check_against_solo left 00 00
+check_against_solo right 00 01
+check_against_solo left 01 02
+check_against_solo right 01 03
+check_against_solo left 02 04
+check_against_solo right 02 05
+
+[ "$SOLO_RC" -eq 0 ] && [ "$LEFT_RC" -eq 0 ] && [ "$RIGHT_RC" -eq 0 ] && [ "$MISMATCH" -eq 0 ]

@@ -24,7 +24,7 @@ if [ ! -x "$BIN" ]; then
   exit 1
 fi
 
-for side in left right; do
+for side in left right solo; do
   rm -rf "fs_pf_$side"
   mkdir -p "fs_pf_$side/screenshots" "fs_pf_$side/.crosspoint"
   cp -r fs_/books "fs_pf_$side/books"
@@ -37,8 +37,17 @@ echo '{"screenMargin":20}' > fs_pf_right/.crosspoint/settings.json
 
 # Stale shots would let a crashed run pass the convergence check below.
 rm -f fs_/screenshots/pf-fs-*.bmp fs_/screenshots/pf-fs-*.png
+rm -f fs_/screenshots/pf-solo-*.bmp fs_/screenshots/pf-solo-*.png
 
+# The reference walk, on the settings the SOURCE half is pushing (the defaults, untouched above).
+# What "converged" means after the sync is that the peer now paginates exactly like this, which a
+# left-versus-right comparison can no longer express: the two halves are a page apart by design
+# once the join negotiation of section 4.2 has run.
 set +e
+CROSSPOINT_SIM_SD=./fs_pf_solo CROSSPOINT_PAGEFLIP_SLOT=0 \
+  timeout "$TIMEOUT" "$BIN" --script "$SCRIPT_DIR/sim_pageflip_solo_ref.script" 2>sim-fs-solo.log >/dev/null
+SOLO_RC=$?
+
 CROSSPOINT_SIM_SD=./fs_pf_left CROSSPOINT_PAGEFLIP_SLOT=0 \
   timeout "$TIMEOUT" "$BIN" --script "$SCRIPT_DIR/sim_pageflip_forcesync_left.script" 2>sim-fs-left.log >/dev/null &
 LEFT_PID=$!
@@ -95,20 +104,25 @@ else
   FAIL=1
 fi
 
-echo "--- and the halves must render alike again ---"
-LEFT_SHOT=$(md5sum fs_/screenshots/pf-fs-left-01.bmp 2>/dev/null | cut -d' ' -f1)
-RIGHT_SHOT=$(md5sum fs_/screenshots/pf-fs-right-01.bmp 2>/dev/null | cut -d' ' -f1)
-if [ -z "$LEFT_SHOT" ] || [ -z "$RIGHT_SHOT" ]; then
-  echo "  FAIL screenshots missing (left=${LEFT_SHOT:-none} right=${RIGHT_SHOT:-none})"
-  FAIL=1
-elif [ "$LEFT_SHOT" = "$RIGHT_SHOT" ]; then
-  # Identical, not offset by one page: the join negotiation (section 4.2, phase 5) is what
-  # establishes the spread. This assertion is the same deliberate canary run_sim_pair.sh carries,
-  # and it must start failing when that lands.
-  echo "  OK   halves match"
-else
-  echo "  FAIL halves still render differently after the sync"
-  FAIL=1
-fi
+echo "--- and the repaired pair must lay out like the source, one page apart ---"
+# Each half against the reference, not against each other. That is what distinguishes a repair that
+# worked from one that merely left the two halves looking different for a new reason: the left must
+# be on the source's page 0 and the right on its page 1, both under the source's pagination.
+check_against_solo() {  # check_against_solo <half> <shot> <reference page>
+  local label="$1" shot="$2" solo="$3" sum solo_sum
+  sum=$(md5sum "fs_/screenshots/pf-fs-$label-$shot.bmp" 2>/dev/null | cut -d' ' -f1)
+  solo_sum=$(md5sum "fs_/screenshots/pf-solo-$solo.bmp" 2>/dev/null | cut -d' ' -f1)
+  if [ -z "$sum" ] || [ -z "$solo_sum" ]; then
+    echo "  FAIL $label-$shot: screenshot missing (shot=${sum:-none} reference=${solo_sum:-none})"
+    FAIL=1
+  elif [ "$sum" = "$solo_sum" ]; then
+    echo "  OK   $label-$shot is the source's page $solo"
+  else
+    echo "  FAIL $label-$shot is not the source's page $solo"
+    FAIL=1
+  fi
+}
+check_against_solo left 01 00
+check_against_solo right 01 01
 
-[ "$LEFT_RC" -eq 0 ] && [ "$RIGHT_RC" -eq 0 ] && [ "$FAIL" -eq 0 ]
+[ "$SOLO_RC" -eq 0 ] && [ "$LEFT_RC" -eq 0 ] && [ "$RIGHT_RC" -eq 0 ] && [ "$FAIL" -eq 0 ]
