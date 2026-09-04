@@ -1,0 +1,34 @@
+# A device that is merely BUSY must not look dead to its partner (docs/pageflip.md section 4),
+# LEFT half: it holds the render lock for ten seconds in the middle of a healthy pair.
+#
+# On real e-ink that is not a contrivance. An image-bearing page was measured at 4,241 ms of render
+# on hardware against 0.88 s for a text page, and two of those back to back exceed the peer's
+# four-missed-heartbeat timeout. Here a refresh is microseconds, so the window has to be asked for:
+# CROSSPOINT_SIM_RENDER_STALL_MS, set by the harness, makes one refresh take that long.
+#
+# This half presses nothing. The stall is triggered by the render that the RIGHT half's page turn
+# causes here, which is what makes the timing a consequence of the pair rather than of this script.
+#
+# It also quits FIRST, a few seconds ahead of the right half. Leaving last would put this instance's
+# own departure inside the right half's log as a second silence, and the check that matters there is
+# that the right half never gave this device up -- a check that cannot tell a stall from a shutdown.
+#
+# The waits below are absolute, not relative to the pairing: two instances started together pair in
+# about two seconds here, and the stall is armed on uptime.
+log pageflip-renderstall-left: start
+expect_timeout 90000
+expect Entering activity: Home
+wait 800
+tap confirm
+expect Entering activity: EpubReader
+expect peer present
+# Everything after this belongs to the stall: the harness arms it for the first refresh past sixteen
+# seconds of uptime, which is the render caused by the right half's first press at about eighteen.
+#
+# `wait` rather than an expect on the release line: ScriptDriver matches expects against a 256-line
+# ring, and a page render buries anything logged next to it.
+wait 32000
+screenshot /screenshots/pf-rs-left-00.bmp
+wait 1000
+log pageflip-renderstall-left: done
+quit

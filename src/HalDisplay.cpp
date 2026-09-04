@@ -5,10 +5,12 @@
 
 #include <array>
 #include <atomic>
+#include <chrono>
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
 #include <string>
+#include <thread>
 #include <vector>
 
 static SDL_Window *window = nullptr;
@@ -50,6 +52,47 @@ constexpr uint8_t kGrayBlack = 0;
 GrayscalePreviewState grayscalePreviewState;
 std::array<uint8_t, HalDisplay::BUFFER_SIZE> frameBufferStorage{};
 bool frameBufferLent = false;
+
+// A refresh here is microseconds; on real e-ink it is seconds, and how many
+// depends on the content -- a text page was measured at 22 ms of panel time on
+// hardware, an image-bearing page at 3,025 ms inside a 4,241 ms render. The
+// render task holds the render lock for the whole of it, so firmware that gives
+// up when that lock is busy has a multi-second window on a device and no window
+// at all here. That difference hides real bugs (the paired-reading heartbeat
+// stopped for the length of a render, and the peer declared a device that was
+// merely busy being read to be gone), so a test needs a way to ask for one.
+//
+// CROSSPOINT_SIM_RENDER_STALL_MS is how long a stalled refresh holds the lock.
+// CROSSPOINT_SIM_RENDER_STALL_AFTER_MS keeps start-up renders fast by holding
+// the stall back until that uptime, which is what lets a test reach the state
+// it wants to stall in. CROSSPOINT_SIM_RENDER_STALL_COUNT is how many
+// refreshes are stalled (default 1): all of them would run out the clock.
+void stallRefreshIfConfigured() {
+  static bool initialized = false;
+  static unsigned long stallMs = 0;
+  static unsigned long afterMs = 0;
+  static long remaining = 0;
+
+  if (!initialized) {
+    initialized = true;
+    const char *stall = std::getenv("CROSSPOINT_SIM_RENDER_STALL_MS");
+    stallMs = stall ? std::strtoul(stall, nullptr, 10) : 0;
+    const char *after = std::getenv("CROSSPOINT_SIM_RENDER_STALL_AFTER_MS");
+    afterMs = after ? std::strtoul(after, nullptr, 10) : 0;
+    const char *count = std::getenv("CROSSPOINT_SIM_RENDER_STALL_COUNT");
+    remaining = count ? std::strtol(count, nullptr, 10) : 1;
+  }
+
+  if (stallMs == 0 || remaining <= 0 || millis() < afterMs)
+    return;
+
+  remaining--;
+  std::cerr << "[SIM] Render stall: holding the render lock for " << stallMs
+            << " ms" << std::endl;
+  std::this_thread::sleep_for(std::chrono::milliseconds(stallMs));
+  std::cerr << "[SIM] Render stall: released after " << stallMs << " ms"
+            << std::endl;
+}
 
 struct ScreenshotEvent {
   unsigned long atMs;
@@ -398,6 +441,7 @@ void HalDisplay::refreshDisplay(RefreshMode /*mode*/, bool /*turnOffScreen*/) {
   const uint8_t *fb = getFrameBuffer();
   snapshotBwBase(fb);
   renderBwPixels(fb);
+  stallRefreshIfConfigured();
 }
 
 // Called from the main thread (simulator_main.cpp) to push pixels to SDL.

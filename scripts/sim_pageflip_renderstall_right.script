@@ -1,0 +1,26 @@
+# The busy-peer case, RIGHT half: it does the pressing, and it is the half whose verdict is under
+# test. Nothing here is slowed down -- this instance renders in microseconds throughout.
+#
+# Two presses, and the gap between them is the whole point. The first drives the left half into a
+# ten-second render at about eighteen seconds of uptime. The second lands at about twenty-six --
+# INSIDE the window where four missed heartbeats have expired the left half's presence here, and
+# before that render ends. A press there advances one page instead of two, and the spread is broken
+# by nothing worse than the other device being busy.
+log pageflip-renderstall-right: start
+expect_timeout 90000
+expect Entering activity: Home
+wait 800
+tap confirm
+expect Entering activity: EpubReader
+expect peer present
+# The press that puts the left half into its long render.
+wait 15000
+tap down
+# The press inside the flap.
+wait 9000
+tap down
+wait 8000
+screenshot /screenshots/pf-rs-right-00.bmp
+wait 4000
+log pageflip-renderstall-right: done
+quit
