@@ -22,6 +22,21 @@ BIN="${SIM_BIN:-./.pio/build/simulator/program}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$SCRIPT_DIR/pageflip_settings.sh"
 
+# Every script here places its presses on absolute uptime, so a slow start moves the whole run out
+# from under them. That is not hypothetical: SDL window creation has taken 15 s on a loaded machine,
+# which put the pair's formation at 26 s -- after the window this harness was aiming at. A failure
+# from that reads exactly like a logic failure, so name it.
+report_slow_start() {  # report_slow_start <log> [limit_ms=4000]
+  local log="$1" limit="${2:-4000}" stamp
+  stamp=$(grep -m1 "Display initialized" "$log" 2>/dev/null | sed -n 's/^\[\([0-9]*\)\].*/\1/p')
+  # Written as a full if: under set -e a false short-circuit ends the whole harness.
+  if [ -z "$stamp" ]; then return 0; fi
+  if [ "$stamp" -gt "$limit" ]; then
+    echo "  NOTE $log started slowly (display ready at ${stamp} ms, limit ${limit}): the timings"
+    echo "       below are measured from boot, so treat a failure here as an environment result."
+  fi
+}
+
 # Longer than PEER_PRESENCE_TIMEOUT_MS (four 2 s heartbeats). ONE stall of ten seconds rather than
 # two of five: between two stalls the pump gets a chance to heartbeat, which is what made this
 # intermittent on hardware -- three flaps on one device, two on the other, in one session.
@@ -70,6 +85,8 @@ for side in left right; do
 done
 
 echo "--- exit codes: left=$LEFT_RC right=$RIGHT_RC (0=quit, 3=expect timeout) ---"
+report_slow_start sim-rs-left.log
+report_slow_start sim-rs-right.log
 
 FAIL=0
 check() {  # check <description> <expected: yes|no> <pattern> <file>

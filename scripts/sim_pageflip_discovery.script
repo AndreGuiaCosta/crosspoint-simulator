@@ -1,0 +1,19 @@
+# Discovery when the first greeting is lost (docs/pageflip.md section 4.2). Both halves run this
+# script; which one is left and which is right comes from the settings file, as on a device.
+#
+# The harness makes each instance drop the first datagram it sends, which is its greeting. On
+# loopback nothing is ever lost, so this case cannot happen here unless it is asked for -- and on a
+# real radio it is ordinary. Two devices switched on together produce it without any loss at all:
+# each greets while the other's radio is still coming up.
+#
+# Nothing is pressed. The only question is whether the pair forms at all.
+log pageflip-discovery: start
+expect_timeout 60000
+expect Entering activity: Home
+wait 800
+tap confirm
+expect Entering activity: EpubReader
+expect peer present
+wait 2000
+log pageflip-discovery: done
+quit
