@@ -157,4 +157,40 @@ echo "--- and no press lost on the way ---"
 # and on the owed step a boundary crossing leaves behind -- neither of which this harness is about.
 check_count "both presses reached the left half" 2 "PageFlip peer turn fwd" sim-hb-left.log
 
+# The link must be down FOR the build, not merely around it. Every check above passed on a build
+# where the resume fired 43 ms after the suspend -- before the chapter build had even begun -- so
+# the radio was resident for the whole of it and the guard bought nothing. Only ordering catches
+# that: the line that brings the link back has to come after the chapter is on screen, not between
+# "Cache not found" and the render that follows it. Measured on two X4s, 2026-09-05.
+check_build_order() {  # check_build_order <side> <file>
+  local suspend build resume render
+  # Anchored on the SUSPEND, not on the first "Cache not found" in the log -- the first one is the
+  # book opening, long before the pair exists, and anchoring there let this check pass on the very
+  # build it was written to fail.
+  suspend=$(grep -n "releasing the paired link to build the chapter" "$2" | head -1 | cut -d: -f1)
+  if [ -z "$suspend" ]; then
+    echo "  FAIL the $1 half never released the link (nothing to order)"
+    FAIL=1
+    return
+  fi
+  build=$(awk -v s="$suspend" 'NR>s && /Cache not found, building/ {print NR; exit}' "$2")
+  resume=$(awk -v s="$suspend" 'NR>s && /bringing the paired link back/ {print NR; exit}' "$2")
+  render=$(awk -v s="$suspend" 'NR>s && /Rendered page/ {print NR; exit}' "$2")
+  if [ -z "$build" ]; then
+    echo "  FAIL the $1 half released the link but never built a chapter"
+    FAIL=1
+  elif [ -z "$resume" ] || [ -z "$render" ]; then
+    echo "  FAIL the $1 half is missing a resume or a render after the build (resume=${resume:-none} render=${render:-none})"
+    FAIL=1
+  elif [ "$resume" -lt "$render" ]; then
+    echo "  FAIL the $1 half took the link back mid-build (resume at line $resume, chapter on screen at $render)"
+    FAIL=1
+  else
+    echo "  ok   the $1 half kept the link down for the whole build"
+  fi
+}
+
+check_build_order left  sim-hb-left.log
+check_build_order right sim-hb-right.log
+
 [ "$LEFT_RC" -eq 0 ] && [ "$RIGHT_RC" -eq 0 ] && [ "$FAIL" -eq 0 ]
