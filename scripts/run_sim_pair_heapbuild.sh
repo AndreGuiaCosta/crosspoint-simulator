@@ -1,0 +1,160 @@
+#!/bin/bash
+# The radio steps aside for a cold chapter build (docs/pageflip.md section 7).
+#
+# WHAT THIS PROVES AND WHAT IT DOES NOT. The host cannot run out of memory, and this harness does
+# not make it: CROSSPOINT_SIM_FREE_HEAP only makes the firmware's heap query REPORT a low figure for
+# a window. So this shows that the guard fires at a cold crossing, that the link goes down, that the
+# pairing survives it, and that the link comes back. It cannot show that the build then fits. Only
+# two X4s can close that, because the failure it guards against was an abort() from a throwing STL
+# allocation inside the section builder, which no host run reproduces.
+#
+# The case is the one that crashed a device on the bench: a peer's page turn crossed a chapter
+# boundary, so BOTH halves began building the same cold section at the same moment, each holding the
+# 60 KB the radio costs. One survived at 4,668 B free; the other did not.
+#
+# Invoke from the firmware repo root:
+#   bash <sim>/scripts/run_sim_pair_heapbuild.sh [timeout=120]
+set -e
+
+TIMEOUT="${1:-120}"
+BIN="${SIM_BIN:-./.pio/build/simulator/program}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+. "$SCRIPT_DIR/pageflip_settings.sh"
+
+# Every script here places its presses on absolute uptime, so a slow start moves the whole run out
+# from under them. That is not hypothetical: SDL window creation has taken 15 s on a loaded machine,
+# which put the pair's formation at 26 s -- after the window this harness was aiming at. A failure
+# from that reads exactly like a logic failure, so name it.
+report_slow_start() {  # report_slow_start <log> [limit_ms=4000]
+  local log="$1" limit="${2:-4000}" stamp
+  stamp=$(grep -m1 "Display initialized" "$log" 2>/dev/null | sed -n 's/^\[\([0-9]*\)\].*/\1/p')
+  # Written as a full if: under set -e a false short-circuit ends the whole harness.
+  if [ -z "$stamp" ]; then return 0; fi
+  if [ "$stamp" -gt "$limit" ]; then
+    echo "  NOTE $log started slowly (display ready at ${stamp} ms, limit ${limit}): the timings"
+    echo "       below are measured from boot, so treat a failure here as an environment result."
+  fi
+}
+
+# Under the firmware's PAGEFLIP_COLD_BUILD_MIN_FREE_HEAP (64 KB), so a cold crossing releases the
+# link -- and above the two floors that would change what else the reader does: the CSS parser gives
+# up under 48 KB and the background build gate pauses under 32 KB. The point is to exercise one
+# branch, not to starve the run.
+PRESSURE_BYTES=57344
+# One window per half, and they do not overlap, because the two halves do not cross at the same
+# moment. A turn that crosses a chapter boundary cannot be announced until the presser has laid the
+# new chapter out -- the landing page does not exist before that -- so the peer learns of the press
+# only as the presser finishes. Each window therefore sits over that half's own crossing.
+RIGHT_PRESSURE_AFTER_MS=14000
+LEFT_PRESSURE_AFTER_MS=17000
+# Deliberately shorter than PEER_PRESENCE_TIMEOUT_MS (8 s). A suspended radio cannot say "still
+# here", so a longer build than that costs presence on the peer -- a real and accepted cost of this
+# trade, but not the subject here. This window asks the narrower question: an ordinary chapter build
+# must cost the pair nothing at all.
+PRESSURE_FOR_MS=3000
+
+if [ ! -x "$BIN" ]; then
+  echo "simulator binary missing at $BIN — run pio run -e simulator first" >&2
+  exit 1
+fi
+
+for side in left right; do
+  rm -rf "fs_pf_$side"
+  mkdir -p "fs_pf_$side/screenshots" "fs_pf_$side/.crosspoint"
+  cp -r fs_/books "fs_pf_$side/books"
+  [ -f fs_/.crosspoint/recent.json ] && cp fs_/.crosspoint/recent.json "fs_pf_$side/.crosspoint/recent.json"
+done
+
+write_pair_settings left
+write_pair_settings right
+
+rm -f fs_/screenshots/pf-hb-*.bmp fs_/screenshots/pf-hb-*.png
+
+set +e
+for side in left right; do
+  slot=0
+  after="$LEFT_PRESSURE_AFTER_MS"
+  if [ "$side" = "right" ]; then
+    slot=1
+    after="$RIGHT_PRESSURE_AFTER_MS"
+  fi
+  CROSSPOINT_SIM_SD="./fs_pf_$side" CROSSPOINT_PAGEFLIP_SLOT="$slot" \
+    CROSSPOINT_SIM_FREE_HEAP="$PRESSURE_BYTES" \
+    CROSSPOINT_SIM_FREE_HEAP_AFTER_MS="$after" \
+    CROSSPOINT_SIM_FREE_HEAP_FOR_MS="$PRESSURE_FOR_MS" \
+    timeout "$TIMEOUT" "$BIN" --script "$SCRIPT_DIR/sim_pageflip_heapbuild_$side.script" \
+    2>"sim-hb-$side.log" >/dev/null &
+  eval "${side}_PID=\$!"
+done
+
+wait $left_PID
+LEFT_RC=$?
+wait $right_PID
+RIGHT_RC=$?
+set -e
+
+for side in left right; do
+  echo "--- $side trace ---"
+  grep -E '^\[SCRIPT\]|PageFlip|Low heap' "sim-hb-$side.log" || true
+done
+
+echo "--- exit codes: left=$LEFT_RC right=$RIGHT_RC (0=quit, 3=expect timeout) ---"
+report_slow_start sim-hb-left.log
+report_slow_start sim-hb-right.log
+
+FAIL=0
+check() {  # check <description> <expected: yes|no> <pattern> <file>
+  if grep -q "$3" "$4"; then FOUND=yes; else FOUND=no; fi
+  if [ "$FOUND" = "$2" ]; then
+    echo "  OK   $1"
+  else
+    echo "  FAIL $1 (expected $2, got $FOUND)"
+    FAIL=1
+  fi
+}
+check_count() {  # check_count <description> <expected count> <pattern> <file>
+  local n
+  n=$(grep -c "$3" "$4")
+  if [ "$n" = "$2" ]; then
+    echo "  OK   $1"
+  else
+    echo "  FAIL $1 (expected $2, got $n)"
+    FAIL=1
+  fi
+}
+
+echo "--- the pair must form, then step aside for the build ---"
+check "the left half paired"           yes "peer present" sim-hb-left.log
+check "the right half paired"          yes "peer present" sim-hb-right.log
+# Both halves, because both cross on the same press. A run where only the presser released would
+# mean the peer-driven crossing -- the one that actually crashed a device -- is still unguarded.
+check "the left half released the link"  yes "releasing the paired link to build the chapter" sim-hb-left.log
+check "the right half released the link" yes "releasing the paired link to build the chapter" sim-hb-right.log
+
+echo "--- and take it back afterwards ---"
+check "the left half came back"        yes "bringing the paired link back" sim-hb-left.log
+check "the right half came back"       yes "bringing the paired link back" sim-hb-right.log
+
+echo "--- with the pairing intact ---"
+# The session outlives the transport, and this is the check that says so. Tearing it down would
+# reset turnSeq and the join, and two halves finishing their builds at different moments classify as
+# Divergent -- a resume prompt in front of the user at every chapter boundary. One join line per log
+# means the negotiation happened once, at start-up, and the suspension did not re-run it.
+check_count "the left half joined once"  1 "PageFlip join:" sim-hb-left.log
+check_count "the right half joined once" 1 "PageFlip join:" sim-hb-right.log
+# A build shorter than four heartbeats must not cost presence at all.
+check "the left half kept its peer"    no "peer went quiet" sim-hb-left.log
+check "the right half kept its peer"   no "peer went quiet" sim-hb-right.log
+
+echo "--- and no press lost on the way ---"
+# Both presses came from the right half, and both must reach the left half: the first while its link
+# was down for the build, the second after it came back. This is the check that caught the defect
+# this harness was written for -- a crossing turn cannot be announced until the new chapter is laid
+# out, which is exactly when the link is down, so announcing it there spent the latch on a send that
+# never happened and the press was lost for good.
+#
+# Counted rather than named by spine, because where two turns land depends on the book's pagination
+# and on the owed step a boundary crossing leaves behind -- neither of which this harness is about.
+check_count "both presses reached the left half" 2 "PageFlip peer turn fwd" sim-hb-left.log
+
+[ "$LEFT_RC" -eq 0 ] && [ "$RIGHT_RC" -eq 0 ] && [ "$FAIL" -eq 0 ]

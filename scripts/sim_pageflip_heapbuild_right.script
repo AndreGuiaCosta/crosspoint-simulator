@@ -1,0 +1,27 @@
+# The cold-chapter case, RIGHT half: it does the pressing. Two presses.
+#
+# The first lands inside the harness's low-heap window and crosses a section boundary, which is what
+# a chapter build looks like from the reader's side. Both halves cross on it, because a paired turn
+# advances the spread, and both should put their link down for the build.
+#
+# The second lands after the window has passed and the link is back. It is the check that the
+# suspension cost the pair nothing durable: the spread still advances by two, with no re-negotiation
+# in between.
+log pageflip-heapbuild-right: start
+expect_timeout 90000
+expect Entering activity: Home
+wait 800
+tap confirm
+expect Entering activity: EpubReader
+expect peer present
+# Inside the low-heap window, and across a chapter boundary.
+wait 13000
+tap down
+# Well after the window closes and the link is back.
+wait 9000
+tap down
+wait 8000
+screenshot /screenshots/pf-hb-right-00.bmp
+wait 1500
+log pageflip-heapbuild-right: done
+quit

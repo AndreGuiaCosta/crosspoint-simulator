@@ -1,0 +1,23 @@
+# A chapter that has to be laid out from scratch must not take the pair down with it
+# (docs/pageflip.md section 7), LEFT half: it presses nothing and crosses the boundary because the
+# right half did, which is the case that killed a device on the bench -- both halves building the
+# same cold chapter at the same moment, each holding the radio's 60 KB.
+#
+# The harness reports a low free-heap figure for a window around that crossing. This instance never
+# actually runs out of memory, and cannot: the check here is that the link goes down for the build
+# and comes back afterwards with the pairing intact, not that the build then fits.
+#
+# It quits first, a few seconds ahead of the right half, so its own departure is not read as a
+# silence in the right half's log.
+log pageflip-heapbuild-left: start
+expect_timeout 90000
+expect Entering activity: Home
+wait 800
+tap confirm
+expect Entering activity: EpubReader
+expect peer present
+wait 28000
+screenshot /screenshots/pf-hb-left-00.bmp
+wait 800
+log pageflip-heapbuild-left: done
+quit
