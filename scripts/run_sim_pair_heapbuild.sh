@@ -41,17 +41,24 @@ report_slow_start() {  # report_slow_start <log> [limit_ms=4000]
 # up under 48 KB and the background build gate pauses under 32 KB. The point is to exercise one
 # branch, not to starve the run.
 PRESSURE_BYTES=57344
-# One window per half, and they do not overlap, because the two halves do not cross at the same
-# moment. A turn that crosses a chapter boundary cannot be announced until the presser has laid the
-# new chapter out -- the landing page does not exist before that -- so the peer learns of the press
-# only as the presser finishes. Each window therefore sits over that half's own crossing.
-RIGHT_PRESSURE_AFTER_MS=14000
-LEFT_PRESSURE_AFTER_MS=17000
-# Deliberately shorter than PEER_PRESENCE_TIMEOUT_MS (8 s). A suspended radio cannot say "still
-# here", so a longer build than that costs presence on the peer -- a real and accepted cost of this
-# trade, but not the subject here. This window asks the narrower question: an ordinary chapter build
-# must cost the pair nothing at all.
-PRESSURE_FOR_MS=3000
+# One window, opened before either half crosses and held across both. The two halves still do not
+# cross at the same moment -- a turn that crosses a chapter boundary cannot be announced until the
+# presser has laid the new chapter out, so the peer learns of the press only as the presser finishes
+# -- but the gap between them is now milliseconds, not seconds, so a single window covers both.
+#
+# It used to be two narrow staggered windows, and that stagger was load-bearing only because the
+# resume waited on the reported heap: the presser stayed down for the whole window and announced its
+# turn on the way out, putting the peer's crossing 3 s later. The resume now waits on the build
+# instead, so the presser is back ~30 ms after it left and the peer crosses almost immediately.
+# Sizing a window to a delay that no longer exists is how this harness fails for the right reason and
+# reports the wrong one.
+PRESSURE_AFTER_MS=13000
+# Still shorter than PEER_PRESENCE_TIMEOUT_MS (8 s), so the stated invariant -- an ordinary chapter
+# build costs the pair no presence -- is a property of the run and not of the window's length. It is
+# no longer what ends the suspension, though: the link comes back when the build is over, and the
+# reported figure is above PAGEFLIP_COLD_BUILD_RESUME_MIN_FREE_HEAP (24 KB) the whole time, so the
+# window can be widened for timing headroom without buying the pass it is supposed to be testing.
+PRESSURE_FOR_MS=6000
 
 if [ ! -x "$BIN" ]; then
   echo "simulator binary missing at $BIN — run pio run -e simulator first" >&2
@@ -73,14 +80,12 @@ rm -f fs_/screenshots/pf-hb-*.bmp fs_/screenshots/pf-hb-*.png
 set +e
 for side in left right; do
   slot=0
-  after="$LEFT_PRESSURE_AFTER_MS"
   if [ "$side" = "right" ]; then
     slot=1
-    after="$RIGHT_PRESSURE_AFTER_MS"
   fi
   CROSSPOINT_SIM_SD="./fs_pf_$side" CROSSPOINT_PAGEFLIP_SLOT="$slot" \
     CROSSPOINT_SIM_FREE_HEAP="$PRESSURE_BYTES" \
-    CROSSPOINT_SIM_FREE_HEAP_AFTER_MS="$after" \
+    CROSSPOINT_SIM_FREE_HEAP_AFTER_MS="$PRESSURE_AFTER_MS" \
     CROSSPOINT_SIM_FREE_HEAP_FOR_MS="$PRESSURE_FOR_MS" \
     timeout "$TIMEOUT" "$BIN" --script "$SCRIPT_DIR/sim_pageflip_heapbuild_$side.script" \
     2>"sim-hb-$side.log" >/dev/null &
@@ -192,5 +197,34 @@ check_build_order() {  # check_build_order <side> <file>
 
 check_build_order left  sim-hb-left.log
 check_build_order right sim-hb-right.log
+
+# And the build must be OVER when the link returns, not merely resting. This is the stronger form of
+# the check above and it is the one that matters: a build that has stopped at BUILD_WINDOW_AHEAD is
+# still holding its BuildContext, and on an X4 that context is enough to put free heap under
+# BACKGROUND_BUILD_MIN_FREE_HEAP -- the floor the build itself needs to advance. The radio coming
+# back on top of that deadlocks the chapter permanently (measured: 4,896 B free, no further page
+# processed in 55 s). "Rendered page" cannot see that, because it is equally true of both.
+#
+# "Build finalized" is the observable, emitted by Section::finalizeBuild(). Its absence between the
+# suspend and the resume IS the bug.
+check_build_finalized_before_resume() {  # <side> <file>
+  local suspend finalized resume
+  suspend=$(grep -n "releasing the paired link to build the chapter" "$2" | head -1 | cut -d: -f1)
+  [ -z "$suspend" ] && return  # already reported by check_build_order
+  resume=$(awk -v s="$suspend" 'NR>s && /bringing the paired link back/ {print NR; exit}' "$2")
+  finalized=$(awk -v s="$suspend" 'NR>s && /Build finalized/ {print NR; exit}' "$2")
+  if [ -z "$resume" ]; then
+    echo "  FAIL the $1 half never took the link back"
+    FAIL=1
+  elif [ -z "$finalized" ] || [ "$finalized" -gt "$resume" ]; then
+    echo "  FAIL the $1 half took the link back onto a live build (finalized=${finalized:-never}, resume=$resume)"
+    FAIL=1
+  else
+    echo "  ok   the $1 half finished the build before taking the link back"
+  fi
+}
+
+check_build_finalized_before_resume left  sim-hb-left.log
+check_build_finalized_before_resume right sim-hb-right.log
 
 [ "$LEFT_RC" -eq 0 ] && [ "$RIGHT_RC" -eq 0 ] && [ "$FAIL" -eq 0 ]
