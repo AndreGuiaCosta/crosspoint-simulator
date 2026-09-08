@@ -48,6 +48,7 @@ public:
   void displayWindow(int x, int y, int w, int h);
   void refreshDisplay(RefreshMode mode = RefreshMode::FAST_REFRESH,
                       bool turnOffScreen = false);
+  void setBusyWaitSliceHook(bool (*)(int8_t, uint8_t)) {}
 
   // Power management
   void deepSleep();
@@ -84,6 +85,7 @@ public:
   void writeGrayscalePlaneStrip(bool lsbPlane, const uint8_t *rows,
                                 uint16_t yStart, uint16_t numRows);
   bool supportsStripGrayscale() const;
+  bool combinesGrayscaleBase() const;
 
   // Simulator only: call from main thread to push rendered pixels to SDL.
   void presentIfNeeded();

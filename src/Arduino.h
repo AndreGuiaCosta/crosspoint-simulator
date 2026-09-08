@@ -1,10 +1,13 @@
 #pragma once
+#include <algorithm>
 #include <cassert>
+#include <cerrno>
 #include <chrono>
 #include <cstdlib>
 #include <cmath>
 #include <cstdarg>
 #include <cstdint>
+#include <cstdlib>
 #include <string>
 #include <thread>
 
@@ -78,15 +81,38 @@ inline uint32_t simulatedFreeHeap() {
 }
 
 struct ESPMock {
+  static constexpr uint32_t HEAP_SIZE = 1024 * 1024;
+
+  static uint32_t heapValue(const char *name) {
+    const char *value = std::getenv(name);
+    if (!value || *value == '\0')
+      return HEAP_SIZE;
+
+    char *end = nullptr;
+    errno = 0;
+    const unsigned long parsed = std::strtoul(value, &end, 10);
+    if (errno == ERANGE || *end != '\0' || parsed > HEAP_SIZE)
+      return HEAP_SIZE;
+    return static_cast<uint32_t>(parsed);
+  }
+
+  // simulatedFreeHeap() rather than heapValue("CROSSPOINT_SIM_FREE_HEAP"):
+  // both read the same variable, but the windowed form also honours
+  // _AFTER_MS / _FOR_MS, so a test can open the pressure window at the moment
+  // it wants rather than for the whole run.
   uint32_t getFreeHeap() { return simulatedFreeHeap(); }
   void restart() {}
-  uint32_t getHeapSize() { return 1024 * 1024; }
+  uint32_t getHeapSize() { return HEAP_SIZE; }
   uint32_t getMinFreeHeap() { return simulatedFreeHeap(); }
-  // Deliberately not driven by the knob above. The firmware asks for the largest
-  // single block in places that have nothing to do with the chapter build under
-  // test (the dictionary, the image decoders), and starving those as a side
-  // effect would fail a harness somewhere far from what it is checking.
-  uint32_t getMaxAllocHeap() { return 1024 * 1024; }
+  // Deliberately not clamped to getFreeHeap(), which is where this departs from
+  // upstream. The firmware asks for the largest single block in places that have
+  // nothing to do with the chapter build under test (the dictionary, the image
+  // decoders), and starving those as a side effect of the free-heap window would
+  // fail a harness somewhere far from what it is checking. The two knobs stay
+  // independent: CROSSPOINT_SIM_MAX_ALLOC_HEAP drives this one on its own.
+  uint32_t getMaxAllocHeap() {
+    return heapValue("CROSSPOINT_SIM_MAX_ALLOC_HEAP");
+  }
 };
 extern ESPMock ESP;
 
