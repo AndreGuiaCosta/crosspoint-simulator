@@ -1,0 +1,37 @@
+# Reference walk for the chapter-skip spread check. One instance, no peer, so a press turns exactly
+# one page and a long press skips exactly one chapter -- which makes this the ground truth the pair
+# is measured against.
+#
+# It performs the same long press the left half performs, so shot 00 is the chapter's first page and
+# shot 01 is its second. A spread reader that skipped correctly shows 00 on the left and 01 on the
+# right.
+#
+# Its settings file is the left half's, byte for byte, so nothing that depends on a setting can
+# differ between this walk and the run it measures. Only peer presence differs, which is the point.
+log pageflip-skip-solo: start
+expect_timeout 90000
+expect Entering activity: Home
+wait 800
+tap confirm
+expect Entering activity: EpubReader
+# First open builds the first chapter's cache.
+wait 9000
+# The control shot: this walk and the left half both sit at spine 0 page 0 here, with the same
+# settings file, differing only in whether a peer is present. It is the only comparison that can
+# say whether peer presence is in the pixels, which decides whether a solo walk can ever be a
+# byte-exact reference for a paired half.
+screenshot /screenshots/pf-sk-solo-ctl.bmp
+# The chapter skip: held past SKIP_HOLD_MS (700 ms), which suppresses the release that follows.
+press down
+wait 900
+release down
+# The chapter this lands in has never been laid out, so this wait is a cold build. It has to be
+# long enough for the build to finish and not merely to have started: a press that arrives while
+# the section is still settling is swallowed, and the second shot then duplicates the first.
+wait 14000
+screenshot /screenshots/pf-sk-solo-00.bmp
+tap down
+wait 5000
+screenshot /screenshots/pf-sk-solo-01.bmp
+log pageflip-skip-solo: done
+quit

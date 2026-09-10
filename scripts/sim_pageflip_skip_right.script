@@ -1,0 +1,24 @@
+# The chapter skip, RIGHT half: it receives no input at all. Every position it takes here comes from
+# the left half's single long press.
+#
+# It must heal rather than step. A skip is not a number of turns, so an implementation that replayed
+# it as steps would either land short or walk the whole chapter -- and the heal it takes must be to
+# the sender's page plus its own role offset, which is what puts it one page ahead on the spread.
+log pageflip-skip-right: start
+expect_timeout 90000
+expect Entering activity: Home
+wait 800
+tap confirm
+expect Entering activity: EpubReader
+expect PageFlip link up as right
+expect peer present
+wait 8000
+screenshot /screenshots/pf-sk-right-00.bmp
+# Driven entirely by the other device's long press. The line carries the SENDER's landing, and this
+# device seeks there and takes one further step for its role.
+expect PageFlip heal
+wait 10000
+screenshot /screenshots/pf-sk-right-01.bmp
+wait 1500
+log pageflip-skip-right: done
+quit

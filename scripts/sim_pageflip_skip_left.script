@@ -1,0 +1,30 @@
+# A long-press chapter skip on a paired device (docs/pageflip.md section 4.3), LEFT half: it does
+# the pressing.
+#
+# A skip lands somewhere no arithmetic on the peer's side could predict, so it is not sent as steps.
+# The device announces where it settled once it has settled, and the peer heals to it --
+# EpubReaderActivity::skipPages() sets announceWhenSettled and drops the section, and the announce
+# waits for the new section AND a link that is up (EpubReaderActivity.cpp:1852).
+#
+# So the whole point of this half is that it presses once and then says nothing else. If the
+# announce is skipped, dropped, or sent before the landing page exists, the right half never moves.
+log pageflip-skip-left: start
+expect_timeout 90000
+expect Entering activity: Home
+wait 800
+tap confirm
+expect Entering activity: EpubReader
+expect PageFlip link up as left
+expect peer present
+# Let the right half finish its own first-chapter build before anything moves.
+wait 8000
+screenshot /screenshots/pf-sk-left-00.bmp
+press down
+wait 900
+release down
+# Cold build of the landing chapter, then the announce once it has settled.
+wait 12000
+screenshot /screenshots/pf-sk-left-01.bmp
+wait 3000
+log pageflip-skip-left: done
+quit

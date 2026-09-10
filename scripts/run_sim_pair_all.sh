@@ -41,6 +41,7 @@ run run_sim_pair_pairing.sh
 run run_sim_pair_renderstall.sh
 run run_sim_pair_heapbuild.sh
 run run_sim_pair_discovery.sh
+run run_sim_pair_skip.sh
 
 echo "=============== solo page-turn regression ==============="
 if bash "$SCRIPT_DIR/run_sim_script.sh" "$SCRIPT_DIR/sim_page_turn.script" >"$OUT" 2>&1; then
