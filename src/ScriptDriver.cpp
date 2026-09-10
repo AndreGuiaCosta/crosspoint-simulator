@@ -20,6 +20,7 @@
 #include <vector>
 
 #include "HalDisplay.h"
+#include "HalGPIO.h"
 #include "WiFi.h"
 
 extern HalDisplay display;
@@ -69,6 +70,31 @@ const std::unordered_map<std::string, SDL_Scancode>& buttonMap() {
       {"power", SDL_SCANCODE_P},
   };
   return m;
+}
+
+// The same names again, as button indices rather than scancodes. "tap" goes through SDL because
+// that path is what every existing harness was written and verified against; "press"/"release" go
+// through HalGPIO::injectButton*, because a HELD button is not expressible as an SDL event -- see
+// the comment on injectButtonDown() in HalGPIO.h. Two mechanisms, deliberately, for two different
+// questions: an edge and a hold.
+const std::unordered_map<std::string, uint8_t>& buttonIndexMap() {
+  static const std::unordered_map<std::string, uint8_t> m = {
+      {"back", HalGPIO::BTN_BACK},   {"confirm", HalGPIO::BTN_CONFIRM}, {"left", HalGPIO::BTN_LEFT},
+      {"right", HalGPIO::BTN_RIGHT}, {"up", HalGPIO::BTN_UP},           {"down", HalGPIO::BTN_DOWN},
+      {"power", HalGPIO::BTN_POWER},
+  };
+  return m;
+}
+
+bool resolveButtonIndex(const std::string& name, uint8_t& out) {
+  const auto& m = buttonIndexMap();
+  const auto it = m.find(name);
+  if (it == m.end()) {
+    std::fprintf(stderr, "[SCRIPT] unknown button '%s'\n", name.c_str());
+    return false;
+  }
+  out = it->second;
+  return true;
 }
 
 // ---------- helpers ----------
@@ -308,16 +334,16 @@ void executeCurrent() {
   const Command& c = commands[cursor];
   switch (c.op) {
     case Command::PRESS: {
-      SDL_Scancode sc;
-      if (!resolveButton(c.arg, sc)) _exit(2);
-      pushKey(sc, SDL_KEYDOWN);
+      uint8_t btn;
+      if (!resolveButtonIndex(c.arg, btn)) _exit(2);
+      gpio.injectButtonDown(btn);
       advance();
       break;
     }
     case Command::RELEASE: {
-      SDL_Scancode sc;
-      if (!resolveButton(c.arg, sc)) _exit(2);
-      pushKey(sc, SDL_KEYUP);
+      uint8_t btn;
+      if (!resolveButtonIndex(c.arg, btn)) _exit(2);
+      gpio.injectButtonUp(btn);
       advance();
       break;
     }

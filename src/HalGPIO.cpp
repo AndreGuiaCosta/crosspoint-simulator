@@ -54,6 +54,34 @@ static bool pressedThisFrame[NUM_BUTTONS] = {};
 static bool releasedThisFrame[NUM_BUTTONS] = {};
 static unsigned long buttonPressTime[NUM_BUTTONS] = {};
 static bool syntheticButtonDown[NUM_BUTTONS] = {};
+// Injected edges wait here for the next update() rather than being written
+// straight into pressedThisFrame/releasedThisFrame. The caller is ScriptDriver,
+// which runs AFTER loop() in the frame (simulator_main.cpp), so an edge set at
+// that moment is wiped by the next beginFrame() before the firmware ever polls
+// it -- the press is simply never seen. Applying them inside update() puts them
+// where SDL's own events land, which is the only point in the frame the firmware
+// looks.
+static bool pendingInjectDown[NUM_BUTTONS] = {};
+static bool pendingInjectUp[NUM_BUTTONS] = {};
+
+static void applyPendingInjections() {
+  for (int i = 0; i < NUM_BUTTONS; i++) {
+    if (pendingInjectDown[i]) {
+      pendingInjectDown[i] = false;
+      pressedThisFrame[i] = true;
+      syntheticButtonDown[i] = true;
+      // Same clock origin as the real keyboard path and processSyntheticEvents():
+      // getHeldTime() subtracts this from SDL_GetTicks(), and mixing origins reads
+      // as an unsigned underflow, which looks exactly like an immediate long press.
+      buttonPressTime[i] = SDL_GetTicks();
+    }
+    if (pendingInjectUp[i]) {
+      pendingInjectUp[i] = false;
+      releasedThisFrame[i] = true;
+      syntheticButtonDown[i] = false;
+    }
+  }
+}
 static bool simulatorSleepRequested = false;
 
 namespace {
@@ -432,6 +460,8 @@ static void clearButtonState() {
     releasedThisFrame[i] = false;
     buttonPressTime[i] = 0;
     syntheticButtonDown[i] = false;
+    pendingInjectDown[i] = false;
+    pendingInjectUp[i] = false;
   }
   touchState = {};
   homeKeyDown = false;
@@ -577,6 +607,7 @@ void HalGPIO::update() {
       endTouch(logicalNx, logicalNy);
     }
   }
+  applyPendingInjections();
   processSyntheticEvents();
   updateTouchHold();
   updateHomeKeyHold();
@@ -631,6 +662,18 @@ unsigned long HalGPIO::getHeldTime() const {
     }
   }
   return maxHeld;
+}
+
+void HalGPIO::injectButtonDown(uint8_t buttonIndex) {
+  if (buttonIndex >= NUM_BUTTONS)
+    return;
+  pendingInjectDown[buttonIndex] = true;
+}
+
+void HalGPIO::injectButtonUp(uint8_t buttonIndex) {
+  if (buttonIndex >= NUM_BUTTONS)
+    return;
+  pendingInjectUp[buttonIndex] = true;
 }
 
 unsigned long HalGPIO::getPowerButtonHeldTime() const {

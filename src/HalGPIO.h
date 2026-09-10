@@ -69,6 +69,16 @@ public:
   bool isDebouncePending() const { return false; }
   unsigned long getHeldTime() const;
   unsigned long getPowerButtonHeldTime() const;
+
+  // Drive a button the way the synthetic event stream does, for callers that
+  // have no SDL window to type into (ScriptDriver). SDL_PushEvent cannot be
+  // used for this: isPressed() and getHeldTime() gate on
+  // SDL_GetKeyboardState(), which SDL only updates for input it originates
+  // itself, so a pushed KEYDOWN is visible as an edge but never as a button
+  // that is still down. Anything that measures a hold -- a chapter skip, a
+  // long-press back -- sees 0 ms and degrades to a tap.
+  void injectButtonDown(uint8_t buttonIndex);
+  void injectButtonUp(uint8_t buttonIndex);
   bool hasTouch() const;
   bool hasHomeKey() const;
   bool wasHomeKeyPressed() const;
